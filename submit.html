@@ -1,1 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Submit a Clip | GamerTagClips</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#0f1117;color:#fff}
+    .wrap{max-width:900px;margin:0 auto;padding:50px 20px}
+    a{color:#93c5fd;text-decoration:none}
+    .top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:25px}
+    .brand{font-weight:900;letter-spacing:.3px}
+    .card{background:#151a24;border:1px solid #232a3a;border-radius:14px;padding:22px}
+    h1{margin:0 0 8px;font-size:34px}
+    .sub{margin:0 0 18px;color:#9ca3af}
+    .grid{display:grid;grid-template-columns:1fr;gap:14px}
+    @media(min-width:820px){.grid{grid-template-columns:1fr 1fr}}
+    label{display:block;font-size:13px;color:#cbd5e1;margin:0 0 6px}
+    input, select, textarea{
+      width:100%; box-sizing:border-box;
+      padding:12px 12px; border-radius:10px;
+      border:1px solid #2b3347; background:#0f1117; color:#fff;
+      outline:none;
+    }
+    textarea{min-height:110px; resize:vertical}
+    .row{display:flex;flex-direction:column}
+    .full{grid-column:1/-1}
+    .hint{font-size:12px;color:#9ca3af;margin-top:6px;line-height:1.35}
+    .btn{
+      display:inline-block; cursor:pointer;
+      padding:12px 18px; border-radius:10px;
+      border:none; font-weight:800;
+      background:#22c55e; color:#08110a;
+    }
+    .btn:hover{background:#16a34a}
+    .muted{color:#9ca3af;font-size:13px;margin-top:14px}
+    .rules{margin-top:16px;color:#9ca3af;font-size:13px;line-height:1.45}
+    .pill{display:inline-block;padding:4px 10px;border-radius:999px;background:#0f1117;border:1px solid #2b3347;color:#cbd5e1;font-size:12px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div class="brand"><a href="/">GamerTagClips</a></div>
+      <div class="pill">Weekly Clip Competition</div>
+    </div>
 
+    <div class="card">
+      <h1>Submit Your Clip</h1>
+      <p class="sub">Submit once. Then share your voting link when voting goes live.</p>
+
+      <!-- Netlify Forms -->
+      <form name="clip-submissions" method="POST" data-netlify="true" netlify-honeypot="bot-field" action="/submit-success.html">
+        <input type="hidden" name="form-name" value="clip-submissions" />
+        <p style="display:none">
+          <label>Don’t fill this out: <input name="bot-field" /></label>
+        </p>
+
+        <div class="grid">
+          <div class="row">
+            <label for="email">Email (for winner contact)</label>
+            <input id="email" name="email" type="email" required placeholder="you@email.com" />
+          </div>
+
+          <div class="row">
+            <label for="gamertag">Gamertag / Display Name</label>
+            <input id="gamertag" name="gamertag" type="text" required placeholder="YourGamertag" />
+          </div>
+
+          <div class="row">
+            <label for="game">Game</label>
+            <select id="game" name="game" required>
+              <option value="" disabled selected>Select a game</option>
+              <option>Warzone</option>
+              <option>Fortnite</option>
+              <option>Valorant</option>
+              <option>Apex Legends</option>
+              <option>CS2</option>
+              <option>Other</option>
+            </select>
+          </div>
+
+          <div class="row">
+            <label for="platform">Platform</label>
+            <select id="platform" name="platform" required>
+              <option value="" disabled selected>Select a platform</option>
+              <option>PC</option>
+              <option>PlayStation</option>
+              <option>Xbox</option>
+              <option>Mobile</option>
+              <option>Other</option>
+            </select>
+          </div>
+
+          <div class="row full">
+            <label for="clip_url">Clip Link (YouTube / TikTok / Twitch)</label>
+            <input id="clip_url" name="clip_url" type="url" required placeholder="https://..." />
+            <div class="hint">Must be public and viewable without login.</div>
+          </div>
+
+          <div class="row full">
+            <label for="title">Clip Title</label>
+            <input id="title" name="title" type="text" required placeholder="e.g., 1v3 clutch with 1 HP" />
+          </div>
+
+          <div class="row full">
+            <label for="caption">Optional Caption</label>
+            <textarea id="caption" name="caption" placeholder="Add context (optional)."></textarea>
+          </div>
+
+          <div class="row full">
+            <button class="btn" type="submit">Submit Clip</button>
+            <div class="rules">
+              By submitting, you confirm you own the content or have permission to share it, and you allow GamerTagClips to display it on the site.
+            </div>
+            <div class="muted">Next: we’ll build the Voting page and automatically pull submissions into it.</div>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</body>
+</html>
