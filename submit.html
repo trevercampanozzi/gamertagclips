@@ -36,6 +36,7 @@
     .muted{color:#9ca3af;font-size:13px;margin-top:14px}
     .rules{margin-top:16px;color:#9ca3af;font-size:13px;line-height:1.45}
     .pill{display:inline-block;padding:4px 10px;border-radius:999px;background:#0f1117;border:1px solid #2b3347;color:#cbd5e1;font-size:12px}
+    .ok{display:none;margin:0 0 14px;padding:12px 12px;border-radius:12px;border:1px solid #14532d;background:#052e16;color:#bbf7d0}
   </style>
 </head>
 <body>
@@ -47,10 +48,17 @@
 
     <div class="card">
       <h1>Submit Your Clip</h1>
-      <p class="sub">Submit once. Then share your voting link when voting goes live.</p>
+      <p class="sub">Submit once. Then share your clip when voting goes live.</p>
 
-      <!-- Netlify Forms -->
-      <form name="clip-submissions" method="POST" data-netlify="true" data-netlify-honeypot="bot-field" action="/submit-success.html">
+      <div id="successBox" class="ok">
+        ✅ Submission received. You’re in for this week.
+        <div class="muted" style="margin-top:8px;">
+          <a href="/vote.html">Go to Voting</a> • <a href="/">Back to Home</a>
+        </div>
+      </div>
+
+      <!-- Netlify Forms (static) -->
+      <form name="clip-submissions" method="POST" data-netlify="true" data-netlify-honeypot="bot-field">
         <input type="hidden" name="form-name" value="clip-submissions" />
         <p style="display:none">
           <label>Don’t fill this out: <input name="bot-field" /></label>
@@ -113,11 +121,20 @@
             <div class="rules">
               By submitting, you confirm you own the content or have permission to share it, and you allow GamerTagClips to display it on the site.
             </div>
-            <div class="muted">Next: we’ll build the Voting page and automatically pull submissions into it.</div>
+            <div class="muted">Next: we’ll make voting real and anti-bot.</div>
           </div>
         </div>
       </form>
     </div>
   </div>
+
+  <script>
+    // If Netlify redirects back with ?success=true we show the message.
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("success") === "true") {
+      document.getElementById("successBox").style.display = "block";
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  </script>
 </body>
 </html>
