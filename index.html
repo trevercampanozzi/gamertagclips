@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>GamerTagClips | Weekly FPS Clip Competition</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
   <style>
     body {
       margin: 0;
@@ -13,15 +14,21 @@
       text-align: center;
     }
 
+    /* Logo Section */
+    .logo-wrapper {
+      text-align: center;
+      padding: 25px 0 10px 0;
+    }
+
+    .site-logo {
+      height: 55px;
+      width: auto;
+    }
+
     .container {
       max-width: 900px;
       margin: 0 auto;
-      padding: 60px 20px;
-    }
-
-    h1 {
-      font-size: 48px;
-      margin-bottom: 10px;
+      padding: 40px 20px 60px 20px;
     }
 
     .subtitle {
@@ -72,39 +79,29 @@
       color: #6b7280;
     }
   </style>
-  
-  <style>
-  .logo-wrapper {
-    text-align: center;
-    padding: 10px 0;
-  }
-
-  .site-logo {
-    height: 60px;   /* Change this to 50px or 40px if you want smaller */
-    width: auto;
-  }
-</style>
-  
 </head>
 
 <body>
 
-<div class="logo-wrapper">
-  <a href="/">
-    <img src="/logo.webp" alt="GamerTagClips Logo" class="site-logo">
-  </a>
-</div>
+  <div class="logo-wrapper">
+    <a href="/">
+      <img src="/logo.webp" alt="GamerTagClips Logo" class="site-logo">
+    </a>
+  </div>
+
+  <div class="container">
+
     <div class="subtitle">
       Weekly FPS Clip Competition. Submit your best play. Community votes. Winner takes the prize.
     </div>
 
-<a href="/submit.html" class="cta-button">
-  Submit Your Clip
-</a>
+    <a href="/submit.html" class="cta-button">
+      Submit Your Clip
+    </a>
 
-<a href="/vote.html" class="cta-button secondary-button">
-  View This Week's Clips
-</a>
+    <a href="/vote.html" class="cta-button secondary-button">
+      View This Week's Clips
+    </a>
 
     <div class="section">
       <h2>This Week's Theme</h2>
@@ -119,6 +116,7 @@
       <p>3. Community votes.</p>
       <p>4. Highest votes wins.</p>
     </div>
+
   </div>
 
   <footer>
@@ -144,16 +142,16 @@
     updateCountdown();
   </script>
 
-<!-- Netlify Forms detector (do not remove) -->
-<form name="clip-submissions" data-netlify="true" data-netlify-honeypot="bot-field" hidden>
-  <input type="text" name="gamertag" />
-  <input type="email" name="email" />
-  <input type="text" name="game" />
-  <input type="text" name="platform" />
-  <input type="url" name="clip_url" />
-  <input type="text" name="title" />
-  <textarea name="caption"></textarea>
-</form>
-  
+  <!-- Netlify Forms detector (do not remove) -->
+  <form name="clip-submissions" data-netlify="true" data-netlify-honeypot="bot-field" hidden>
+    <input type="text" name="gamertag" />
+    <input type="email" name="email" />
+    <input type="text" name="game" />
+    <input type="text" name="platform" />
+    <input type="url" name="clip_url" />
+    <input type="text" name="title" />
+    <textarea name="caption"></textarea>
+  </form>
+
 </body>
 </html>
