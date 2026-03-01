@@ -14,27 +14,28 @@
       text-align: center;
     }
 
-    /* Logo Section */
-    .logo-wrapper {
-      text-align: center;
-      padding: 25px 0 10px 0;
-    }
-
-    .site-logo {
-      height: 100px;
-      width: auto;
-    }
-
     .container {
       max-width: 900px;
       margin: 0 auto;
-      padding: 40px 20px 60px 20px;
+      padding: 50px 20px 60px 20px; /* a bit more top padding so logo sits nicely */
+    }
+
+    /* Logo Section (now visually tied to the hero content) */
+    .logo-wrapper {
+      margin-bottom: 18px;
+    }
+
+    .site-logo {
+      height: 85px;  /* feels bigger once it's anchored in the container */
+      width: auto;
+      display: block;
+      margin: 0 auto;
     }
 
     .subtitle {
       font-size: 20px;
       color: #9ca3af;
-      margin-bottom: 40px;
+      margin-bottom: 34px;
     }
 
     .cta-button {
@@ -73,7 +74,7 @@
     }
 
     footer {
-      margin-top: 80px;
+      margin-top: 60px;
       padding: 20px;
       font-size: 14px;
       color: #6b7280;
@@ -83,13 +84,13 @@
 
 <body>
 
-  <div class="logo-wrapper">
-    <a href="/">
-      <img src="/logo.webp" alt="GamerTagClips Logo" class="site-logo">
-    </a>
-  </div>
-
   <div class="container">
+
+    <div class="logo-wrapper">
+      <a href="/" aria-label="Go to homepage">
+        <img src="/logo.webp" alt="GamerTagClips Logo" class="site-logo">
+      </a>
+    </div>
 
     <div class="subtitle">
       Weekly FPS Clip Competition. Submit your best play. Community votes. Winner takes the prize.
