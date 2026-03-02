@@ -23,6 +23,12 @@ function stableHash(str) {
   return crypto.createHash("sha256").update(str).digest("hex");
 }
 
+async function getJson(store, key, fallback) {
+  const raw = await store.get(key);
+  if (!raw) return fallback;
+  try { return JSON.parse(raw); } catch { return fallback; }
+}
+
 export default async (req) => {
   if (req.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
 
@@ -44,7 +50,7 @@ export default async (req) => {
     const ip = ipFromReq(req);
     const voteKey = `v:${week}:${clipId}:${stableHash(ip)}`;
 
-    const existing = await store.get(voteKey, { type: "json" });
+    const existing = await getJson(store, voteKey, null);
     if (existing && existing.ts) {
       return new Response(JSON.stringify({ ok: false, error: "Vote already counted recently. Try later." }), {
         status: 429,
@@ -53,7 +59,7 @@ export default async (req) => {
     }
 
     const clipsKey = `clips:${week}`;
-    const clips = (await store.get(clipsKey, { type: "json" })) || [];
+    const clips = await getJson(store, clipsKey, []);
 
     const idx = clips.findIndex((c) => String(c.id) === clipId);
     if (idx === -1) {
@@ -66,13 +72,12 @@ export default async (req) => {
     clips[idx].votes = (clips[idx].votes || 0) + 1;
     clips[idx].lastVoteAt = new Date().toISOString();
 
-    await store.set(clipsKey, clips, { type: "json" });
-
-    await store.set(voteKey, { ts: Date.now() }, { type: "json", ttl: 60 * 60 * 12 });
+    await store.set(clipsKey, JSON.stringify(clips));
+    await store.set(voteKey, JSON.stringify({ ts: Date.now() }), { ttl: 60 * 60 * 12 });
 
     return new Response(JSON.stringify({ ok: true, week, clipId, votes: clips[idx].votes }), {
       status: 200,
-      headers: { "content-type": "application/json; charset=utf-8" }
+      headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }
     });
   } catch (err) {
     return new Response(JSON.stringify({ error: "vote-post failed", detail: String(err) }), {
