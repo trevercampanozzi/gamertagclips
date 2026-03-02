@@ -45,17 +45,16 @@ export default async () => {
       }
     ];
 
-    await store.set(`clips:${week}`, sampleClips, { type: "json" });
+    await store.set(`clips:${week}`, JSON.stringify(sampleClips));
 
-    return new Response(
-      JSON.stringify({ ok: true, week, count: sampleClips.length }),
-      { status: 200, headers: { "content-type": "application/json" } }
-    );
-
+    return new Response(JSON.stringify({ ok: true, week, count: sampleClips.length }), {
+      status: 200,
+      headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }
+    });
   } catch (err) {
-    return new Response(
-      JSON.stringify({ error: "Seed failed", detail: String(err) }),
-      { status: 500, headers: { "content-type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: "Seed failed", detail: String(err) }), {
+      status: 500,
+      headers: { "content-type": "application/json; charset=utf-8" }
+    });
   }
 };
