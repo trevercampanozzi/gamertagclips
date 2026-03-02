@@ -1,117 +1,264 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Vote | GamerTagClips</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Vote — GamerTagClips</title>
+
   <style>
-    body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#0f1117;color:#fff}
-    a{color:#93c5fd;text-decoration:none}
-    .wrap{max-width:1100px;margin:0 auto;padding:40px 20px}
-    .top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
-    .brand{font-weight:900;letter-spacing:.3px}
-    .pill{display:inline-block;padding:4px 10px;border-radius:999px;background:#0f1117;border:1px solid #2b3347;color:#cbd5e1;font-size:12px}
-    h1{margin:8px 0 8px;font-size:34px}
-    .sub{margin:0 0 18px;color:#9ca3af;line-height:1.45}
-    .bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin:18px 0}
-    .btn{
-      display:inline-block; padding:11px 16px; border-radius:10px;
-      background:#22c55e; color:#08110a; font-weight:800; text-decoration:none; border:none;
+    :root{
+      --bg:#0b0f19;
+      --panel:rgba(255,255,255,.04);
+      --border:rgba(255,255,255,.10);
+      --text:#e8eefc;
+      --muted:rgba(232,238,252,.78);
+      --blue:#2d6cff;
+      --green:#61ffb0;
+      --red:#ff7a7a;
     }
-    .btn:hover{background:#16a34a}
-    .btn2{background:#2563eb;color:#fff}
-    .btn2:hover{background:#1d4ed8}
-    .card{background:#151a24;border:1px solid #232a3a;border-radius:14px;padding:18px}
-    .grid{display:grid;grid-template-columns:1fr;gap:14px}
-    @media(min-width:860px){.grid{grid-template-columns:1fr 1fr}}
-    @media(min-width:1180px){.grid{grid-template-columns:1fr 1fr 1fr}}
-    .clip{
-      background:#0f1117;border:1px solid #2b3347;border-radius:14px;
-      padding:14px; display:flex; flex-direction:column; gap:10px;
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      background:var(--bg);
+      color:var(--text);
     }
-    .title{font-weight:900}
-    .meta{font-size:12px;color:#9ca3af}
-    .voteRow{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:auto}
-    .small{font-size:12px;color:#9ca3af}
-    .notice{color:#fbbf24;font-size:13px;line-height:1.45}
-    .hr{height:1px;background:#232a3a;margin:14px 0}
-    input, select{
-      padding:10px 10px;border-radius:10px;border:1px solid #2b3347;background:#0f1117;color:#fff;outline:none
+    header{
+      padding:18px 16px;
+      border-bottom:1px solid rgba(255,255,255,.08);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
     }
+    header strong{letter-spacing:.2px}
+    nav a{
+      color:#9cc2ff;
+      text-decoration:none;
+      font-weight:700;
+    }
+    nav a:hover{text-decoration:underline}
+    .wrap{max-width:1100px;margin:0 auto;padding:16px}
+    .meta{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      flex-wrap:wrap;
+      opacity:.92;
+      margin:10px 0 18px;
+    }
+    .meta-left{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .pill{
+      font-size:12px;
+      padding:6px 10px;
+      border-radius:999px;
+      background:rgba(255,255,255,.07);
+      border:1px solid rgba(255,255,255,.10);
+      color:var(--text);
+    }
+    .grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
+      gap:12px;
+    }
+    .card{
+      background:var(--panel);
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:14px;
+      overflow:hidden;
+    }
+    .thumb{
+      width:100%;
+      aspect-ratio:16/9;
+      background:#111;
+      display:block;
+      object-fit:cover;
+    }
+    .pad{padding:12px}
+    .title{
+      font-weight:900;
+      margin:0 0 6px;
+      font-size:16px;
+      line-height:1.2;
+    }
+    .sub{
+      opacity:.82;
+      font-size:13px;
+      margin:0 0 10px;
+    }
+    .row{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+    }
+    button{
+      background:var(--blue);
+      color:white;
+      border:0;
+      border-radius:10px;
+      padding:10px 12px;
+      font-weight:900;
+      cursor:pointer;
+    }
+    button[disabled]{opacity:.55;cursor:not-allowed}
+    .msg{margin-top:10px;font-size:13px}
+    .ok{color:var(--green)}
+    .bad{color:var(--red)}
+    .loader{opacity:.85}
+    .footer{
+      opacity:.7;
+      margin:18px 0 0;
+      font-size:12px;
+      line-height:1.35;
+    }
+    .link{
+      color:#9cc2ff;
+      text-decoration:none;
+      font-weight:800;
+    }
+    .link:hover{text-decoration:underline}
   </style>
 </head>
+
 <body>
+  <header>
+    <div><strong>GamerTagClips</strong> — Vote</div>
+    <nav>
+      <a href="/">Home</a> ·
+      <a href="/submit.html">Submit</a>
+    </nav>
+  </header>
+
   <div class="wrap">
-    <div class="top">
-      <div class="brand"><a href="/">GamerTagClips</a></div>
-      <div class="pill">Voting</div>
+    <div class="meta">
+      <div class="meta-left">
+        <span class="pill" id="weekPill">Week: …</span>
+        <span class="pill" id="countPill">Clips: …</span>
+      </div>
+      <span class="pill" id="statusPill">Loading…</span>
     </div>
 
-    <div class="card">
-      <h1>This Week’s Clips</h1>
-      <p class="sub">
-        Vote for your favorite. One vote per person per day (we’ll enforce this in the next step).
-      </p>
+    <div class="grid" id="grid"></div>
 
-      <div class="bar">
-        <div class="small">
-          Theme: <b>Best FPS Clutch Moment</b>
-        </div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <a class="btn btn2" href="/submit.html">Submit a Clip</a>
-          <a class="btn" href="#how">How voting works</a>
-        </div>
-      </div>
-
-      <div class="hr"></div>
-
-      <!-- IMPORTANT:
-           Right now these are demo entries.
-           Next step: we will automatically load real submissions from Netlify Forms.
-      -->
-      <div class="grid" id="clips">
-        <div class="clip">
-          <div class="title">Demo Clip #1</div>
-          <div class="meta">Gamertag: DemoPlayer • Game: Warzone</div>
-          <a href="#" target="_blank" rel="noopener">Watch clip</a>
-          <div class="voteRow">
-            <button class="btn" disabled>Vote</button>
-            <div class="small">Votes: 0</div>
-          </div>
-        </div>
-
-        <div class="clip">
-          <div class="title">Demo Clip #2</div>
-          <div class="meta">Gamertag: DemoPlayer2 • Game: Fortnite</div>
-          <a href="#" target="_blank" rel="noopener">Watch clip</a>
-          <div class="voteRow">
-            <button class="btn" disabled>Vote</button>
-            <div class="small">Votes: 0</div>
-          </div>
-        </div>
-
-        <div class="clip">
-          <div class="title">Demo Clip #3</div>
-          <div class="meta">Gamertag: DemoPlayer3 • Game: Valorant</div>
-          <a href="#" target="_blank" rel="noopener">Watch clip</a>
-          <div class="voteRow">
-            <button class="btn" disabled>Vote</button>
-            <div class="small">Votes: 0</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="hr"></div>
-
-      <div id="how" class="notice">
-        <b>How voting works (MVP):</b><br>
-        • You can vote once per day.<br>
-        • Highest votes wins the weekly prize.<br>
-        • Anti-bot protection is coming next (simple + effective).<br>
-        <br>
-        <b>Next build step:</b> automatically show real submitted clips here and store votes.
-      </div>
+    <div class="footer">
+      Basic protection is enabled (rate-limit per clip per IP). Next we’ll add stronger anti-bot (Turnstile) and automate weekly clip loading from Netlify Forms.
     </div>
   </div>
+
+<script>
+  const grid = document.getElementById('grid');
+  const weekPill = document.getElementById('weekPill');
+  const countPill = document.getElementById('countPill');
+  const statusPill = document.getElementById('statusPill');
+
+  function esc(s){
+    return String(s||"").replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m]));
+  }
+
+  function setStatus(text, kind){
+    statusPill.textContent = text;
+    statusPill.style.borderColor = 'rgba(255,255,255,.10)';
+    if(kind === 'ok') statusPill.style.borderColor = 'rgba(97,255,176,.35)';
+    if(kind === 'bad') statusPill.style.borderColor = 'rgba(255,122,122,.35)';
+  }
+
+  async function loadClips(){
+    setStatus('Loading…', null);
+    grid.innerHTML = '';
+
+    const res = await fetch('/.netlify/functions/clips-get', { cache: 'no-store' });
+    const data = await res.json();
+
+    weekPill.textContent = `Week: ${data.week || '—'}`;
+    countPill.textContent = `Clips: ${data.count ?? '—'}`;
+
+    if (!data.clips || !data.clips.length) {
+      setStatus('No clips yet', 'bad');
+      grid.innerHTML = `
+        <div class="card">
+          <div class="pad">
+            <p class="title">No clips yet</p>
+            <p class="sub">We’ll auto-load weekly submissions next. For now, submit a clip so we have something to vote on.</p>
+            <a class="link" href="/submit.html">Submit a clip →</a>
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    setStatus('Ready to vote', 'ok');
+
+    data.clips.forEach(c => {
+      const id = esc(c.id);
+      const title = esc(c.title || 'Untitled Clip');
+      const gamerTag = esc(c.gamerTag || c.gamertag || '');
+      const game = esc(c.game || '');
+      const votes = Number(c.votes || 0);
+
+      const thumbUrl = c.thumbUrl || c.thumbnail || '';
+      const clipUrl = c.clipUrl || c.url || '';
+
+      const el = document.createElement('div');
+      el.className = 'card';
+      el.innerHTML = `
+        ${thumbUrl ? `<img class="thumb" src="${esc(thumbUrl)}" alt="${title}">` : `<div class="thumb"></div>`}
+        <div class="pad">
+          <p class="title">${title}</p>
+          <p class="sub">${[gamerTag && `@${gamerTag}`, game].filter(Boolean).join(' • ')}</p>
+
+          <div class="row">
+            <span class="pill"><strong>${votes}</strong> vote(s)</span>
+            <button data-id="${id}">Vote</button>
+          </div>
+
+          ${clipUrl ? `<div class="msg"><a class="link" href="${esc(clipUrl)}" target="_blank" rel="noopener">Watch clip →</a></div>` : ``}
+          <div class="msg" id="m-${id}"></div>
+        </div>
+      `;
+      grid.appendChild(el);
+    });
+
+    grid.querySelectorAll('button[data-id]').forEach(btn => {
+      btn.addEventListener('click', () => vote(btn));
+    });
+  }
+
+  async function vote(btn){
+    const clipId = btn.getAttribute('data-id');
+    const msg = document.getElementById(`m-${clipId}`);
+    msg.textContent = '';
+    msg.className = 'msg';
+    btn.disabled = true;
+
+    try{
+      const res = await fetch('/.netlify/functions/vote-post', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ clipId })
+      });
+      const data = await res.json();
+
+      if (!res.ok || data.ok === false) {
+        msg.className = 'msg bad';
+        msg.textContent = data.error || 'Vote failed';
+        btn.disabled = false;
+        return;
+      }
+
+      msg.className = 'msg ok';
+      msg.textContent = 'Vote counted ✅';
+
+      await loadClips();
+    } catch(e){
+      msg.className = 'msg bad';
+      msg.textContent = 'Vote failed. Try again.';
+      btn.disabled = false;
+    }
+  }
+
+  loadClips();
+</script>
 </body>
 </html>
