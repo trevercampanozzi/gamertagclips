@@ -10,13 +10,26 @@ function getWeekKey(date = new Date()) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+async function getJson(store, key, fallback) {
+  const raw = await store.get(key);
+  if (!raw) return fallback;
+
+  try {
+    return JSON.parse(raw);
+  } catch {
+    // self-heal if bad data like "[object Object]" is stored
+    await store.set(key, JSON.stringify(fallback));
+    return fallback;
+  }
+}
+
 export default async (req) => {
   try {
     const url = new URL(req.url);
     const week = url.searchParams.get("week") || getWeekKey(new Date());
 
     const store = getStore("gtc");
-    const clips = (await store.get(`clips:${week}`, { type: "json" })) || [];
+    const clips = await getJson(store, `clips:${week}`, []);
 
     clips.sort((a, b) => (b.votes || 0) - (a.votes || 0));
 
