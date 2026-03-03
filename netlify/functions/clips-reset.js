@@ -13,9 +13,16 @@ function getWeekKey(date = new Date()) {
 export default async () => {
   const store = getStore("gtc");
   const week = getWeekKey();
+
+  // Clear clips for the week
   await store.set(`clips:${week}`, JSON.stringify([]));
-  return new Response(JSON.stringify({ ok: true, week, reset: true }), {
+
+  // Set a cutoff so sync only imports submissions AFTER this reset
+  const cutoffISO = new Date().toISOString();
+  await store.set(`cutoff:${week}`, cutoffISO);
+
+  return new Response(JSON.stringify({ ok: true, week, reset: true, cutoffISO }), {
     status: 200,
-    headers: { "content-type": "application/json" }
+    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }
   });
 };
