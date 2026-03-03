@@ -12,11 +12,8 @@ function getWeekKey(date = new Date()) {
 }
 
 function ipFromReq(req) {
-  return (
-    req.headers.get("x-nf-client-connection-ip") ||
-    (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() ||
-    "0.0.0.0"
-  );
+  // Prefer Netlify’s stable IP header
+  return req.headers.get("x-nf-client-connection-ip") || "0.0.0.0";
 }
 
 function stableHash(str) {
@@ -46,15 +43,16 @@ export default async (req) => {
 
     const store = getStore("gtc");
 
-    // Basic anti-bot: 1 vote per IP per clip per 12 hours
+    // 1 vote per IP per clip per 12 hours
     const ip = ipFromReq(req);
     const voteKey = `v:${week}:${clipId}:${stableHash(ip)}`;
 
-    const existing = await getJson(store, voteKey, null);
-    if (existing && existing.ts) {
+    // Treat ANY existing value as "already voted"
+    const already = await store.get(voteKey);
+    if (already) {
       return new Response(JSON.stringify({ ok: false, error: "Vote already counted recently. Try later." }), {
         status: 429,
-        headers: { "content-type": "application/json; charset=utf-8" }
+        headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }
       });
     }
 
@@ -73,7 +71,7 @@ export default async (req) => {
     clips[idx].lastVoteAt = new Date().toISOString();
 
     await store.set(clipsKey, JSON.stringify(clips));
-    await store.set(voteKey, JSON.stringify({ ts: Date.now() }), { ttl: 60 * 60 * 12 });
+    await store.set(voteKey, "1", { ttl: 60 * 60 * 12 });
 
     return new Response(JSON.stringify({ ok: true, week, clipId, votes: clips[idx].votes }), {
       status: 200,
