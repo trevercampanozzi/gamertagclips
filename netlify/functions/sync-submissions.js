@@ -37,15 +37,12 @@ function youtubeThumbFromUrl(clipUrl) {
     const u = new URL(clipUrl);
     let videoId = "";
 
-    // watch?v=VIDEO_ID
     videoId = u.searchParams.get("v") || "";
 
-    // youtu.be/VIDEO_ID
     if (!videoId && u.hostname.includes("youtu.be")) {
       videoId = u.pathname.split("/").filter(Boolean)[0] || "";
     }
 
-    // youtube.com/shorts/VIDEO_ID
     if (!videoId && u.pathname.includes("/shorts/")) {
       videoId = u.pathname.split("/shorts/")[1]?.split("/")[0]?.split("?")[0] || "";
     }
@@ -69,13 +66,11 @@ async function apiGet(path) {
     const txt = await res.text();
     throw new Error(`Netlify API ${res.status}: ${txt}`);
   }
-
   return res.json();
 }
 
 export default async (req) => {
   try {
-    // Admin protection
     const adminKey = process.env.GTC_ADMIN_KEY;
     if (adminKey) {
       const url = new URL(req.url);
@@ -93,12 +88,22 @@ export default async (req) => {
 
     const url = new URL(req.url);
     const week = url.searchParams.get("week") || getWeekKey(new Date());
-    const sinceISO = weekStartISO(week);
+
+    const store = getStore("gtc");
+    const clipsKey = `clips:${week}`;
+
+    // Week boundary (Monday UTC)
+    const weekSinceISO = weekStartISO(week);
+
+    // Reset cutoff (if you've run clips-reset this week)
+    const cutoffISO = (await store.get(`cutoff:${week}`)) || "";
+
+    // Effective "since" is the later of week start vs cutoff
+    const sinceISO = cutoffISO && cutoffISO > weekSinceISO ? cutoffISO : weekSinceISO;
 
     // Find the form by name
     const forms = await apiGet(`/sites/${siteId}/forms`);
     const form = forms.find(f => f.name === "clip-submissions");
-
     if (!form) {
       return new Response(JSON.stringify({
         ok: false,
@@ -108,16 +113,15 @@ export default async (req) => {
       }), { status: 404, headers: { "content-type": "application/json; charset=utf-8" } });
     }
 
-    // Pull recent submissions
+    // Fetch submissions
     const submissions = await apiGet(`/forms/${form.id}/submissions?per_page=100`);
 
-    // Filter to this week (created_at >= Monday UTC)
+    // Filter by effective sinceISO
     const weeklySubs = submissions.filter(s => {
       const created = new Date(s.created_at).toISOString();
       return created >= sinceISO;
     });
 
-    // Map submissions -> clips
     const mapped = weeklySubs.map((s) => {
       const data = s.data || {};
 
@@ -127,7 +131,6 @@ export default async (req) => {
       const gamerTag = escTrim(pick(data, ["gamerTag", "gamertag", "gamer_tag"]));
       const game = escTrim(pick(data, ["game", "gameTitle", "game_title"]));
 
-      // Auto thumbnail for YouTube (watch, shorts, youtu.be)
       if (!thumbUrl && (clipUrl.includes("youtube") || clipUrl.includes("youtu.be"))) {
         thumbUrl = youtubeThumbFromUrl(clipUrl);
       }
@@ -144,12 +147,10 @@ export default async (req) => {
       };
     });
 
-    // Merge into existing weekly clips (preserve vote counts)
-    const store = getStore("gtc");
-    const clipsKey = `clips:${week}`;
+    // Merge into existing (preserve votes)
     const existing = await getJson(store, clipsKey, []);
-
     const byId = new Map(existing.map(c => [String(c.id), c]));
+
     let added = 0, updated = 0;
 
     for (const c of mapped) {
