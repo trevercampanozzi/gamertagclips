@@ -2,16 +2,15 @@ import { getStore } from "@netlify/blobs";
 
 function getWeekKey(date = new Date()) {
   const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-  const day = d.getUTCDay() || 7; // Sunday => 7
-  d.setUTCDate(d.getUTCDate() - (day - 1)); // back to Monday
+  const day = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() - (day - 1));
   const yyyy = d.getUTCFullYear();
   const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
   const dd = String(d.getUTCDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`; // Monday date
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 function weekStartISO(weekKey) {
-  // weekKey is YYYY-MM-DD (Monday UTC)
   return new Date(`${weekKey}T00:00:00.000Z`).toISOString();
 }
 
@@ -35,7 +34,7 @@ async function getJson(store, key, fallback) {
 
 async function apiGet(path) {
   const token = process.env.NETLIFY_AUTH_TOKEN;
-  if (!token) throw new Error("Missing NETLIFY_AUTH_TOKEN env var");
+  if (!token) throw new Error("Missing NETLIFY_AUTH_TOKEN");
 
   const res = await fetch(`https://api.netlify.com/api/v1${path}`, {
     headers: { Authorization: `Bearer ${token}` }
@@ -45,13 +44,12 @@ async function apiGet(path) {
     const txt = await res.text();
     throw new Error(`Netlify API ${res.status}: ${txt}`);
   }
+
   return res.json();
 }
 
 export default async (req) => {
   try {
-    // Optional admin key protection (recommended).
-    // If you set process.env.GTC_ADMIN_KEY, calls must include ?key=...
     const adminKey = process.env.GTC_ADMIN_KEY;
     if (adminKey) {
       const url = new URL(req.url);
@@ -65,13 +63,12 @@ export default async (req) => {
     }
 
     const siteId = process.env.NETLIFY_SITE_ID;
-    if (!siteId) throw new Error("Missing NETLIFY_SITE_ID env var");
+    if (!siteId) throw new Error("Missing NETLIFY_SITE_ID");
 
     const url = new URL(req.url);
     const week = url.searchParams.get("week") || getWeekKey(new Date());
     const sinceISO = weekStartISO(week);
 
-    // 1) Find the form by name
     const forms = await apiGet(`/sites/${siteId}/forms`);
     const form = forms.find(f => f.name === "clip-submissions");
 
@@ -79,32 +76,39 @@ export default async (req) => {
       return new Response(JSON.stringify({
         ok: false,
         error: "Form not found",
-        detail: "No form named 'clip-submissions' found on this Netlify site.",
-        foundForms: forms.map(f => f.name).slice(0, 20)
+        foundForms: forms.map(f => f.name)
       }), { status: 404, headers: { "content-type": "application/json; charset=utf-8" } });
     }
 
-    // 2) Pull recent submissions (we’ll grab up to 100 and filter by week)
     const submissions = await apiGet(`/forms/${form.id}/submissions?per_page=100`);
 
-    // 3) Filter to this week (created_at >= Monday UTC)
     const weeklySubs = submissions.filter(s => {
       const created = new Date(s.created_at).toISOString();
       return created >= sinceISO;
     });
 
-    // 4) Map submissions -> clips
-    // NOTE: adjust field keys later if your submit form uses different names.
     const mapped = weeklySubs.map((s) => {
       const data = s.data || {};
+
       const clipUrl = escTrim(pick(data, ["clipUrl", "clip_url", "url", "link"]));
-      const thumbUrl = escTrim(pick(data, ["thumbUrl", "thumb_url", "thumbnail", "thumbnailUrl"]));
+      let thumbUrl = escTrim(pick(data, ["thumbUrl", "thumb_url", "thumbnail", "thumbnailUrl"]));
       const title = escTrim(pick(data, ["title", "clipTitle", "clip_title"]));
       const gamerTag = escTrim(pick(data, ["gamerTag", "gamertag", "gamer_tag"]));
       const game = escTrim(pick(data, ["game", "gameTitle", "game_title"]));
 
+      // Auto-generate YouTube thumbnail if none provided
+      if (!thumbUrl && clipUrl.includes("youtube")) {
+        try {
+          const urlObj = new URL(clipUrl);
+          const videoId = urlObj.searchParams.get("v");
+          if (videoId) {
+            thumbUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+          }
+        } catch {}
+      }
+
       return {
-        id: s.id,                 // stable + unique
+        id: s.id,
         title: title || "Submitted Clip",
         gamerTag,
         game,
@@ -115,20 +119,25 @@ export default async (req) => {
       };
     });
 
-    // 5) Merge into existing weekly clips (preserve vote counts if already present)
     const store = getStore("gtc");
     const clipsKey = `clips:${week}`;
     const existing = await getJson(store, clipsKey, []);
 
     const byId = new Map(existing.map(c => [String(c.id), c]));
-    let added = 0, updated = 0;
+
+    let added = 0;
+    let updated = 0;
 
     for (const c of mapped) {
       const id = String(c.id);
       if (byId.has(id)) {
-        // preserve votes + lastVoteAt if present
         const prev = byId.get(id);
-        byId.set(id, { ...prev, ...c, votes: prev.votes ?? 0, lastVoteAt: prev.lastVoteAt });
+        byId.set(id, {
+          ...prev,
+          ...c,
+          votes: prev.votes ?? 0,
+          lastVoteAt: prev.lastVoteAt
+        });
         updated++;
       } else {
         byId.set(id, c);
@@ -137,7 +146,6 @@ export default async (req) => {
     }
 
     const merged = Array.from(byId.values());
-    // Sort newest first (you can change later)
     merged.sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0));
 
     await store.set(clipsKey, JSON.stringify(merged));
@@ -145,8 +153,6 @@ export default async (req) => {
     return new Response(JSON.stringify({
       ok: true,
       week,
-      form: { id: form.id, name: form.name },
-      since: sinceISO,
       submissionsFetched: submissions.length,
       submissionsThisWeek: weeklySubs.length,
       clipsBefore: existing.length,
@@ -155,11 +161,15 @@ export default async (req) => {
       updated
     }), {
       status: 200,
-      headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }
+      headers: { "content-type": "application/json; charset=utf-8" }
     });
 
   } catch (err) {
-    return new Response(JSON.stringify({ ok: false, error: "sync failed", detail: String(err) }), {
+    return new Response(JSON.stringify({
+      ok: false,
+      error: "sync failed",
+      detail: String(err)
+    }), {
       status: 500,
       headers: { "content-type": "application/json; charset=utf-8" }
     });
