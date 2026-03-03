@@ -106,7 +106,6 @@
     .msg{margin-top:10px;font-size:13px}
     .ok{color:var(--green)}
     .bad{color:var(--red)}
-    .loader{opacity:.85}
     .footer{
       opacity:.7;
       margin:18px 0 0;
@@ -143,7 +142,7 @@
     <div class="grid" id="grid"></div>
 
     <div class="footer">
-      Basic protection is enabled (rate-limit per clip per IP). Next we’ll add stronger anti-bot (Turnstile) and automate weekly clip loading from Netlify Forms.
+      Voting is rate-limited per clip per IP. Next upgrades: scheduled sync + stronger bot protection (Turnstile).
     </div>
   </div>
 
@@ -180,7 +179,7 @@
         <div class="card">
           <div class="pad">
             <p class="title">No clips yet</p>
-            <p class="sub">We’ll auto-load weekly submissions next. For now, submit a clip so we have something to vote on.</p>
+            <p class="sub">Submit a clip so we have something to vote on.</p>
             <a class="link" href="/submit.html">Submit a clip →</a>
           </div>
         </div>
@@ -209,7 +208,7 @@
           <p class="sub">${[gamerTag && `@${gamerTag}`, game].filter(Boolean).join(' • ')}</p>
 
           <div class="row">
-            <span class="pill"><strong>${votes}</strong> vote(s)</span>
+            <span class="pill"><strong class="voteCount">${votes}</strong> vote(s)</span>
             <button data-id="${id}">Vote</button>
           </div>
 
@@ -227,7 +226,10 @@
 
   async function vote(btn){
     const clipId = btn.getAttribute('data-id');
+    const card = btn.closest('.card');
+    const countEl = card ? card.querySelector('.voteCount') : null;
     const msg = document.getElementById(`m-${clipId}`);
+
     msg.textContent = '';
     msg.className = 'msg';
     btn.disabled = true;
@@ -247,10 +249,14 @@
         return;
       }
 
+      // ✅ instant UI update
       msg.className = 'msg ok';
       msg.textContent = 'Vote counted ✅';
+      if (countEl) countEl.textContent = String(Number(countEl.textContent || "0") + 1);
 
-      await loadClips();
+      // background refresh (keeps ordering accurate)
+      setTimeout(() => loadClips(), 700);
+
     } catch(e){
       msg.className = 'msg bad';
       msg.textContent = 'Vote failed. Try again.';
