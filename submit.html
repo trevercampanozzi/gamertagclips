@@ -1,4 +1,4 @@
-<!doctype html> 
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -37,6 +37,7 @@
     .rules{margin-top:16px;color:#9ca3af;font-size:13px;line-height:1.45}
     .pill{display:inline-block;padding:4px 10px;border-radius:999px;background:#0f1117;border:1px solid #2b3347;color:#cbd5e1;font-size:12px}
     .ok{display:none;margin:0 0 14px;padding:12px 12px;border-radius:12px;border:1px solid #14532d;background:#052e16;color:#bbf7d0}
+    .err{display:none;margin:0 0 14px;padding:12px 12px;border-radius:12px;border:1px solid #7f1d1d;background:#2a0f12;color:#fecaca}
   </style>
 </head>
 <body>
@@ -57,13 +58,16 @@
         </div>
       </div>
 
-      <!-- Netlify Forms (static) -->
-      <form name="clip-submissions" method="POST" data-netlify="true" data-netlify-honeypot="bot-field">
-  <input type="hidden" name="form-name" value="clip-submissions" />
-        <input type="hidden" name="redirect" value="/submit?success=true" />
-  <p style="display:none">
-    <label>Don’t fill this out: <input name="bot-field" /></label>
-  </p>
+      <div id="errorBox" class="err">
+        ❌ Submission failed. Please try again.
+      </div>
+
+      <!-- Netlify Forms (JS submit to avoid Netlify generic success page) -->
+      <form id="clipForm" name="clip-submissions" method="POST" data-netlify="true" data-netlify-honeypot="bot-field">
+        <input type="hidden" name="form-name" value="clip-submissions" />
+        <p style="display:none">
+          <label>Don’t fill this out: <input name="bot-field" /></label>
+        </p>
 
         <div class="grid">
           <div class="row">
@@ -118,7 +122,7 @@
           </div>
 
           <div class="row full">
-            <button class="btn" type="submit">Submit Clip</button>
+            <button class="btn" id="submitBtn" type="submit">Submit Clip</button>
             <div class="rules">
               By submitting, you confirm you own the content or have permission to share it, and you allow GamerTagClips to display it on the site.
             </div>
@@ -130,12 +134,54 @@
   </div>
 
   <script>
-    // If Netlify redirects back with ?success=true we show the message.
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("success") === "true") {
-      document.getElementById("successBox").style.display = "block";
+    const form = document.getElementById("clipForm");
+    const successBox = document.getElementById("successBox");
+    const errorBox = document.getElementById("errorBox");
+    const submitBtn = document.getElementById("submitBtn");
+
+    function showSuccess() {
+      errorBox.style.display = "none";
+      successBox.style.display = "block";
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
+
+    function showError() {
+      successBox.style.display = "none";
+      errorBox.style.display = "block";
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      successBox.style.display = "none";
+      errorBox.style.display = "none";
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Submitting…";
+
+      try {
+        const formData = new FormData(form);
+
+        const res = await fetch("/", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams(formData).toString()
+        });
+
+        if (res.ok) {
+          form.reset();
+          showSuccess();
+        } else {
+          showError();
+        }
+      } catch (err) {
+        showError();
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Submit Clip";
+      }
+    });
   </script>
 </body>
 </html>
