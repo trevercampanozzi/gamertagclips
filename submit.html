@@ -134,54 +134,57 @@
   </div>
 
   <script>
-    const form = document.getElementById("clipForm");
-    const successBox = document.getElementById("successBox");
-    const errorBox = document.getElementById("errorBox");
-    const submitBtn = document.getElementById("submitBtn");
+  const form = document.getElementById("clipForm");
+  const successBox = document.getElementById("successBox");
+  const errorBox = document.getElementById("errorBox");
+  const submitBtn = document.getElementById("submitBtn");
 
-    function showSuccess() {
-      errorBox.style.display = "none";
-      successBox.style.display = "block";
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
+  function showSuccess() {
+    errorBox.style.display = "none";
+    successBox.style.display = "block";
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 
-    function showError() {
-      successBox.style.display = "none";
-      errorBox.style.display = "block";
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
+  function showError() {
+    successBox.style.display = "none";
+    errorBox.style.display = "block";
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
 
-      successBox.style.display = "none";
-      errorBox.style.display = "none";
+    successBox.style.display = "none";
+    errorBox.style.display = "none";
 
-      submitBtn.disabled = true;
-      submitBtn.textContent = "Submitting…";
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Submitting…";
 
-      try {
-        const formData = new FormData(form);
+    try {
+      const formData = new FormData(form);
 
-        const res = await fetch("/", {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams(formData).toString()
-        });
+      // IMPORTANT: post to the current page (/submit), not "/"
+      const postTo = window.location.pathname;
 
-        if (res.ok) {
-          form.reset();
-          showSuccess();
-        } else {
-          showError();
-        }
-      } catch (err) {
+      const res = await fetch(postTo, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams(formData).toString()
+      });
+
+      if (res.ok) {
+        form.reset();
+        showSuccess();
+      } else {
         showError();
-      } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = "Submit Clip";
       }
-    });
-  </script>
+    } catch (err) {
+      showError();
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Submit Clip";
+    }
+  });
+</script>
 </body>
 </html>
