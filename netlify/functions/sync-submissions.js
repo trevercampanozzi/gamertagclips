@@ -32,6 +32,31 @@ async function getJson(store, key, fallback) {
   try { return JSON.parse(raw); } catch { return fallback; }
 }
 
+function youtubeThumbFromUrl(clipUrl) {
+  try {
+    const u = new URL(clipUrl);
+    let videoId = "";
+
+    // watch?v=VIDEO_ID
+    videoId = u.searchParams.get("v") || "";
+
+    // youtu.be/VIDEO_ID
+    if (!videoId && u.hostname.includes("youtu.be")) {
+      videoId = u.pathname.split("/").filter(Boolean)[0] || "";
+    }
+
+    // youtube.com/shorts/VIDEO_ID
+    if (!videoId && u.pathname.includes("/shorts/")) {
+      videoId = u.pathname.split("/shorts/")[1]?.split("/")[0]?.split("?")[0] || "";
+    }
+
+    if (!videoId) return "";
+    return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+  } catch {
+    return "";
+  }
+}
+
 async function apiGet(path) {
   const token = process.env.NETLIFY_AUTH_TOKEN;
   if (!token) throw new Error("Missing NETLIFY_AUTH_TOKEN");
@@ -50,6 +75,7 @@ async function apiGet(path) {
 
 export default async (req) => {
   try {
+    // Admin protection
     const adminKey = process.env.GTC_ADMIN_KEY;
     if (adminKey) {
       const url = new URL(req.url);
@@ -69,6 +95,7 @@ export default async (req) => {
     const week = url.searchParams.get("week") || getWeekKey(new Date());
     const sinceISO = weekStartISO(week);
 
+    // Find the form by name
     const forms = await apiGet(`/sites/${siteId}/forms`);
     const form = forms.find(f => f.name === "clip-submissions");
 
@@ -76,17 +103,21 @@ export default async (req) => {
       return new Response(JSON.stringify({
         ok: false,
         error: "Form not found",
-        foundForms: forms.map(f => f.name)
+        detail: "No form named 'clip-submissions' found on this Netlify site.",
+        foundForms: forms.map(f => f.name).slice(0, 50)
       }), { status: 404, headers: { "content-type": "application/json; charset=utf-8" } });
     }
 
+    // Pull recent submissions
     const submissions = await apiGet(`/forms/${form.id}/submissions?per_page=100`);
 
+    // Filter to this week (created_at >= Monday UTC)
     const weeklySubs = submissions.filter(s => {
       const created = new Date(s.created_at).toISOString();
       return created >= sinceISO;
     });
 
+    // Map submissions -> clips
     const mapped = weeklySubs.map((s) => {
       const data = s.data || {};
 
@@ -96,49 +127,36 @@ export default async (req) => {
       const gamerTag = escTrim(pick(data, ["gamerTag", "gamertag", "gamer_tag"]));
       const game = escTrim(pick(data, ["game", "gameTitle", "game_title"]));
 
-      // Auto-generate YouTube thumbnail if none provided
-      if (!thumbUrl && clipUrl.includes("youtube")) {
-        try {
-          const urlObj = new URL(clipUrl);
-          const videoId = urlObj.searchParams.get("v");
-          if (videoId) {
-            thumbUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
-          }
-        } catch {}
+      // Auto thumbnail for YouTube (watch, shorts, youtu.be)
+      if (!thumbUrl && (clipUrl.includes("youtube") || clipUrl.includes("youtu.be"))) {
+        thumbUrl = youtubeThumbFromUrl(clipUrl);
       }
 
       return {
-  id: s.id,
-  title: title || "Submitted Clip",
-  gamerTag,
-  game,
-  clipUrl,
-  thumbUrl,
-  debugData: data,
-  votes: 0,
-  submittedAt: s.created_at
-};
+        id: s.id,
+        title: title || "Submitted Clip",
+        gamerTag,
+        game,
+        clipUrl,
+        thumbUrl,
+        votes: 0,
+        submittedAt: s.created_at
+      };
     });
 
+    // Merge into existing weekly clips (preserve vote counts)
     const store = getStore("gtc");
     const clipsKey = `clips:${week}`;
     const existing = await getJson(store, clipsKey, []);
 
     const byId = new Map(existing.map(c => [String(c.id), c]));
-
-    let added = 0;
-    let updated = 0;
+    let added = 0, updated = 0;
 
     for (const c of mapped) {
       const id = String(c.id);
       if (byId.has(id)) {
         const prev = byId.get(id);
-        byId.set(id, {
-          ...prev,
-          ...c,
-          votes: prev.votes ?? 0,
-          lastVoteAt: prev.lastVoteAt
-        });
+        byId.set(id, { ...prev, ...c, votes: prev.votes ?? 0, lastVoteAt: prev.lastVoteAt });
         updated++;
       } else {
         byId.set(id, c);
@@ -154,6 +172,8 @@ export default async (req) => {
     return new Response(JSON.stringify({
       ok: true,
       week,
+      form: { id: form.id, name: form.name },
+      since: sinceISO,
       submissionsFetched: submissions.length,
       submissionsThisWeek: weeklySubs.length,
       clipsBefore: existing.length,
@@ -162,15 +182,11 @@ export default async (req) => {
       updated
     }), {
       status: 200,
-      headers: { "content-type": "application/json; charset=utf-8" }
+      headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }
     });
 
   } catch (err) {
-    return new Response(JSON.stringify({
-      ok: false,
-      error: "sync failed",
-      detail: String(err)
-    }), {
+    return new Response(JSON.stringify({ ok: false, error: "sync failed", detail: String(err) }), {
       status: 500,
       headers: { "content-type": "application/json; charset=utf-8" }
     });
