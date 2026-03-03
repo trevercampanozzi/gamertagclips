@@ -108,15 +108,16 @@ export default async (req) => {
       }
 
       return {
-        id: s.id,
-        title: title || "Submitted Clip",
-        gamerTag,
-        game,
-        clipUrl,
-        thumbUrl,
-        votes: 0,
-        submittedAt: s.created_at
-      };
+  id: s.id,
+  title: title || "Submitted Clip",
+  gamerTag,
+  game,
+  clipUrl,
+  thumbUrl,
+  debugData: data,
+  votes: 0,
+  submittedAt: s.created_at
+};
     });
 
     const store = getStore("gtc");
