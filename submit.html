@@ -58,8 +58,9 @@
       </div>
 
       <!-- Netlify Forms (static) -->
-      <form name="clip-submissions" method="POST" data-netlify="true" data-netlify-honeypot="bot-field" action="/submit-success.html">
+      <form name="clip-submissions" method="POST" data-netlify="true" data-netlify-honeypot="bot-field">
         <input type="hidden" name="form-name" value="clip-submissions" />
+        <input type="hidden" name="redirect" value="/submit-success.html">
         <p style="display:none">
           <label>Don’t fill this out: <input name="bot-field" /></label>
         </p>
