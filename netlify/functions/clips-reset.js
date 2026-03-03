@@ -10,19 +10,39 @@ function getWeekKey(date = new Date()) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-export default async () => {
-  const store = getStore("gtc");
-  const week = getWeekKey();
+export default async (req) => {
+  try {
+    // Require admin key (same pattern as sync-submissions)
+    const adminKey = process.env.GTC_ADMIN_KEY;
+    if (adminKey) {
+      const url = new URL(req.url);
+      const key = url.searchParams.get("key") || "";
+      if (key !== adminKey) {
+        return new Response(JSON.stringify({ ok: false, error: "Unauthorized" }), {
+          status: 401,
+          headers: { "content-type": "application/json; charset=utf-8" }
+        });
+      }
+    }
 
-  // Clear clips for the week
-  await store.set(`clips:${week}`, JSON.stringify([]));
+    const store = getStore("gtc");
+    const week = getWeekKey();
 
-  // Set a cutoff so sync only imports submissions AFTER this reset
-  const cutoffISO = new Date().toISOString();
-  await store.set(`cutoff:${week}`, cutoffISO);
+    // Wipe the week's clips completely
+    await store.set(`clips:${week}`, JSON.stringify([]));
 
-  return new Response(JSON.stringify({ ok: true, week, reset: true, cutoffISO }), {
-    status: 200,
-    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }
-  });
+    // Set cutoff so sync only imports submissions AFTER this reset moment
+    const cutoffISO = new Date().toISOString();
+    await store.set(`cutoff:${week}`, cutoffISO);
+
+    return new Response(JSON.stringify({ ok: true, week, reset: true, cutoffISO }), {
+      status: 200,
+      headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ ok: false, error: "reset failed", detail: String(err) }), {
+      status: 500,
+      headers: { "content-type": "application/json; charset=utf-8" }
+    });
+  }
 };
