@@ -179,14 +179,14 @@
     <!-- TOP 10 -->
     <div class="section-title">
       <h2>🏆 Top 10 This Week</h2>
-      <div class="hint">Automatically updates — if #11 beats #10, it bumps into the Top 10.</div>
+      <div class="hint">Auto-updates — if #11 beats #10, it bumps into the Top 10.</div>
     </div>
     <div class="grid" id="topGrid"></div>
 
-    <!-- ALL CLIPS -->
+    <!-- ALL CLIPS (EXCLUDING TOP 10) -->
     <div class="section-title">
       <h2>🗂️ All Clips (Newest First)</h2>
-      <div class="hint">New submissions show here immediately.</div>
+      <div class="hint" id="allHint">Excludes the Top 10 so nothing is duplicated.</div>
     </div>
     <div class="grid" id="allGrid"></div>
 
@@ -202,6 +202,7 @@
 
   const topGrid = document.getElementById('topGrid');
   const allGrid = document.getElementById('allGrid');
+  const allHint = document.getElementById('allHint');
 
   let CURRENT_WEEK = "";
 
@@ -244,8 +245,11 @@
     const thumbUrl = c.thumbUrl || '';
     const clipUrl = c.clipUrl || '';
 
-    const rankHtml = opts && opts.rank ? `<span class="pill"><span class="rank">#${opts.rank}</span></span>` : '';
-    const leaderClass = opts && opts.leader ? 'leader' : '';
+    const rankHtml = (opts && opts.rank)
+      ? `<span class="pill"><span class="rank">#${opts.rank}</span></span>`
+      : '';
+
+    const leaderClass = (opts && opts.leader) ? 'leader' : '';
 
     const el = document.createElement('div');
     el.className = `card ${leaderClass}`.trim();
@@ -280,6 +284,7 @@
     setStatus('Loading…', null);
     topGrid.innerHTML = '';
     allGrid.innerHTML = '';
+    allHint.textContent = 'Excludes the Top 10 so nothing is duplicated.';
 
     const res = await fetch('/.netlify/functions/clips-get', { cache: 'no-store' });
     const data = await res.json();
@@ -291,7 +296,7 @@
     if (!data.clips || !data.clips.length) {
       setStatus('No clips yet', 'bad');
 
-      topGrid.innerHTML = `
+      const emptyHtml = `
         <div class="card">
           <div class="pad">
             <p class="title">No clips yet</p>
@@ -300,7 +305,8 @@
           </div>
         </div>
       `;
-      allGrid.innerHTML = topGrid.innerHTML;
+      topGrid.innerHTML = emptyHtml;
+      allGrid.innerHTML = emptyHtml;
       return;
     }
 
@@ -308,32 +314,37 @@
 
     const clips = data.clips.map(normalizeClip);
 
-    // Top 10: votes desc, tie-breaker newer submission wins
+    // Top 10: votes desc, tie-breaker newer wins
     const top10 = [...clips].sort((a,b) => {
       const dv = (Number(b.votes)||0) - (Number(a.votes)||0);
       if(dv !== 0) return dv;
       return toMs(b.submittedAt) - toMs(a.submittedAt);
     }).slice(0, 10);
 
-    // All clips: newest first (so new submissions show immediately)
-    const allSorted = [...clips].sort((a,b) => {
-      const ds = toMs(b.submittedAt) - toMs(a.submittedAt);
-      if(ds !== 0) return ds;
-      return (Number(b.votes)||0) - (Number(a.votes)||0);
-    });
+    // Build a set of Top 10 ids so we can exclude them below
+    const topIds = new Set(top10.map(c => String(c.id)));
+
+    // All clips: newest first, EXCLUDING Top 10
+    const allSorted = [...clips]
+      .filter(c => !topIds.has(String(c.id)))
+      .sort((a,b) => {
+        const ds = toMs(b.submittedAt) - toMs(a.submittedAt);
+        if(ds !== 0) return ds;
+        return (Number(b.votes)||0) - (Number(a.votes)||0);
+      });
+
+    allHint.textContent = `Excludes the Top 10 so nothing is duplicated. (${allSorted.length} clip${allSorted.length===1?'':'s'} below)`;
 
     // Render Top 10
     topGrid.innerHTML = '';
     top10.forEach((c, i) => {
-      const el = renderCard(c, { rank: i + 1, leader: true });
-      topGrid.appendChild(el);
+      topGrid.appendChild(renderCard(c, { rank: i + 1, leader: true }));
     });
 
     // Render All
     allGrid.innerHTML = '';
     allSorted.forEach(c => {
-      const el = renderCard(c, { leader: false });
-      allGrid.appendChild(el);
+      allGrid.appendChild(renderCard(c, { leader: false }));
     });
 
     wireVotes(topGrid);
@@ -369,7 +380,7 @@
       msg.textContent = 'Vote counted ✅';
       if (countEl) countEl.textContent = String(Number(data.votes || 0));
 
-      // Re-load to re-rank Top 10 / All lists (keeps leaderboard accurate)
+      // reload so Top 10 / All re-ranks correctly
       setTimeout(loadClips, 650);
 
     } catch(e){
