@@ -252,10 +252,10 @@
       // ✅ instant UI update
       msg.className = 'msg ok';
       msg.textContent = 'Vote counted ✅';
-      if (countEl) countEl.textContent = String(Number(countEl.textContent || "0") + 1);
+      if (countEl) countEl.textContent = String(data.votes ?? (Number(countEl.textContent || "0") + 1));
 
       // background refresh (keeps ordering accurate)
-      setTimeout(() => loadClips(), 700);
+      setTimeout(() => loadClips(), 1500);
 
     } catch(e){
       msg.className = 'msg bad';
