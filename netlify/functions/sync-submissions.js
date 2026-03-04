@@ -32,31 +32,6 @@ async function getJson(store, key, fallback) {
   try { return JSON.parse(raw); } catch { return fallback; }
 }
 
-function normalizeClipUrl(raw) {
-  const clipUrl = escTrim(raw);
-  if (!clipUrl) return "";
-
-  try {
-    const u = new URL(clipUrl);
-
-    let host = u.hostname.toLowerCase();
-    if (host.startsWith("www.")) host = host.slice(4);
-
-    // normalize youtube tracking params that cause "duplicates"
-    if (host.includes("youtube.com") || host.includes("youtu.be")) {
-      u.searchParams.delete("si");
-      u.searchParams.delete("feature");
-    }
-
-    u.hostname = host;
-
-    const s = u.toString();
-    return s.endsWith("/") ? s.slice(0, -1) : s;
-  } catch {
-    return clipUrl;
-  }
-}
-
 function youtubeThumbFromUrl(clipUrl) {
   try {
     const u = new URL(clipUrl);
@@ -96,6 +71,7 @@ async function apiGet(path) {
 
 export default async (req) => {
   try {
+    // auth (manual URL + auto-sync both use this)
     const adminKey = process.env.GTC_ADMIN_KEY;
     if (adminKey) {
       const url = new URL(req.url);
@@ -117,7 +93,10 @@ export default async (req) => {
     const store = getStore("gtc");
     const clipsKey = `clips:${week}`;
 
+    // week boundary (Monday UTC)
     const weekSinceISO = weekStartISO(week);
+
+    // reset cutoff support (if you ever use it)
     const cutoffISO = (await store.get(`cutoff:${week}`)) || "";
     const sinceISO = cutoffISO && cutoffISO > weekSinceISO ? cutoffISO : weekSinceISO;
 
@@ -133,7 +112,7 @@ export default async (req) => {
       }), { status: 404, headers: { "content-type": "application/json; charset=utf-8" } });
     }
 
-    // Fetch verified + spam submissions
+    // ✅ Fetch verified + spam
     const verified = await apiGet(`/forms/${form.id}/submissions?per_page=100`);
     const spam = await apiGet(`/forms/${form.id}/submissions?per_page=100&state=spam`);
     const all = [...verified, ...spam];
@@ -144,64 +123,46 @@ export default async (req) => {
       return created >= sinceISO;
     });
 
-// Existing clips (preserve votes and prevent reprocessing same submission)
-const existing = await getJson(store, clipsKey, []);
-const existingIdSet = new Set(existing.map(c => String(c.id)));
-
-const mapped = weeklySubs.map((s) => {
-  const data = s.data || {};
-
-  const clipUrl = escTrim(pick(data, ["clipUrl", "clip_url", "url", "link"]));
-  if (!clipUrl) return null;
-
-  let thumbUrl = escTrim(pick(data, ["thumbUrl", "thumb_url", "thumbnail", "thumbnailUrl"]));
-  const title = escTrim(pick(data, ["title", "clipTitle", "clip_title"]));
-  const gamerTag = escTrim(pick(data, ["gamerTag", "gamertag", "gamer_tag"]));
-  const game = escTrim(pick(data, ["game", "gameTitle", "game_title"]));
-
-  if (!thumbUrl && (clipUrl.includes("youtube") || clipUrl.includes("youtu.be"))) {
-    thumbUrl = youtubeThumbFromUrl(clipUrl);
-  }
-
-  return {
-    id: s.id,
-    title: title || "Submitted Clip",
-    gamerTag,
-    game,
-    clipUrl,
-    thumbUrl,
-    votes: 0,
-    submittedAt: s.created_at
-  };
-}).filter(Boolean);
-    
-    // Merge into existing (preserve votes)
+    // Existing clips (preserve votes + prevent re-adding the SAME submission ID)
+    const existing = await getJson(store, clipsKey, []);
     const byId = new Map(existing.map(c => [String(c.id), c]));
 
-    let added = 0, updated = 0;
-    let skippedEmpty = 0, skippedDuplicates = 0;
+    let added = 0, updated = 0, skippedEmpty = 0, skippedAlreadySynced = 0;
 
     for (const s of weeklySubs) {
       const data = s.data || {};
-      const clipUrlRaw = pick(data, ["clipUrl", "clip_url", "url", "link"]);
-      const clipUrl = normalizeClipUrl(clipUrlRaw);
 
-      if (!clipUrl) skippedEmpty++;
-      else if (existingUrlSet.has(clipUrl)) skippedDuplicates++;
-    }
+      const clipUrl = escTrim(pick(data, ["clipUrl", "clip_url", "url", "link"]));
+      if (!clipUrl) { skippedEmpty++; continue; }
 
-    for (const c of mapped) {
-      const id = String(c.id);
-      if (byId.has(id)) {
-        const prev = byId.get(id);
-        byId.set(id, { ...prev, ...c, votes: prev.votes ?? 0, lastVoteAt: prev.lastVoteAt });
-        updated++;
-      } else {
-        byId.set(id, c);
-        added++;
+      const id = String(s.id);
+      if (byId.has(id)) { skippedAlreadySynced++; continue; }
+
+      let thumbUrl = escTrim(pick(data, ["thumbUrl", "thumb_url", "thumbnail", "thumbnailUrl"]));
+      const title = escTrim(pick(data, ["title", "clipTitle", "clip_title"]));
+      const gamerTag = escTrim(pick(data, ["gamerTag", "gamertag", "gamer_tag"]));
+      const game = escTrim(pick(data, ["game", "gameTitle", "game_title"]));
+
+      if (!thumbUrl && (clipUrl.includes("youtube") || clipUrl.includes("youtu.be"))) {
+        thumbUrl = youtubeThumbFromUrl(clipUrl);
       }
+
+      const newClip = {
+        id,
+        title: title || "Submitted Clip",
+        gamerTag,
+        game,
+        clipUrl,
+        thumbUrl,
+        votes: 0,
+        submittedAt: s.created_at
+      };
+
+      byId.set(id, newClip);
+      added++;
     }
 
+    // Sort newest first
     const merged = Array.from(byId.values());
     merged.sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0));
 
@@ -220,7 +181,7 @@ const mapped = weeklySubs.map((s) => {
       added,
       updated,
       skippedEmpty,
-      skippedDuplicates
+      skippedAlreadySynced
     }), {
       status: 200,
       headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }
