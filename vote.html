@@ -152,6 +152,9 @@
   const countPill = document.getElementById('countPill');
   const statusPill = document.getElementById('statusPill');
 
+  // IMPORTANT: we must send the same week key that clips-get returns
+  let CURRENT_WEEK = "";
+
   function esc(s){
     return String(s||"").replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m]));
   }
@@ -170,6 +173,7 @@
     const res = await fetch('/.netlify/functions/clips-get', { cache: 'no-store' });
     const data = await res.json();
 
+    CURRENT_WEEK = data.week || "";
     weekPill.textContent = `Week: ${data.week || '—'}`;
     countPill.textContent = `Clips: ${data.count ?? '—'}`;
 
@@ -238,7 +242,7 @@
       const res = await fetch('/.netlify/functions/vote-post', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ clipId })
+        body: JSON.stringify({ clipId, week: CURRENT_WEEK })
       });
       const data = await res.json();
 
@@ -249,14 +253,17 @@
         return;
       }
 
-      // ✅ instant UI update
       msg.className = 'msg ok';
       msg.textContent = 'Vote counted ✅';
-      if (countEl) countEl.textContent = String(data.votes ?? (Number(countEl.textContent || "0") + 1));
 
-      // background refresh (keeps ordering accurate)
-    
-    } catch(e){ 
+      if (countEl) {
+        countEl.textContent = String(data.votes ?? (Number(countEl.textContent || "0") + 1));
+      }
+
+      // keep button disabled after successful vote
+      // (rate limit is server-side anyway, this just prevents confusion)
+
+    } catch(e){
       msg.className = 'msg bad';
       msg.textContent = 'Vote failed. Try again.';
       btn.disabled = false;

@@ -31,7 +31,7 @@ export default async (req) => {
   try {
     const body = await req.json();
     const clipId = String(body.clipId || "").trim();
-    const week = String(body.week || getWeekKey(new Date())).trim();
+    const week = String(body.week || "").trim(); // IMPORTANT: must be provided by client
 
     if (!clipId) {
       return new Response(JSON.stringify({ error: "Missing clipId" }), {
@@ -40,13 +40,18 @@ export default async (req) => {
       });
     }
 
+    if (!week) {
+      return new Response(JSON.stringify({ error: "Missing week" }), {
+        status: 400,
+        headers: { "content-type": "application/json; charset=utf-8" }
+      });
+    }
+
     const store = getStore("gtc");
 
-    // 1 vote per IP per clip per 12 hours
     const ip = ipFromReq(req);
     const voteKey = `v:${week}:${clipId}:${stableHash(ip)}`;
 
-    // If already voted, block
     const already = await store.get(voteKey);
     if (already) {
       return new Response(JSON.stringify({ ok: false, error: "Vote already counted recently. Try later." }), {
@@ -55,10 +60,9 @@ export default async (req) => {
       });
     }
 
-    // IMPORTANT: set the lock FIRST (prevents rapid double-click counting)
+    // lock first
     await store.set(voteKey, "1", { ttl: 60 * 60 * 12 });
 
-    // Now increment the vote
     const clipsKey = `clips:${week}`;
     const clips = await getJson(store, clipsKey, []);
 
