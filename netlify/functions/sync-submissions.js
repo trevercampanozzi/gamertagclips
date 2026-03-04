@@ -1,3 +1,5 @@
+export const config = { schedule: "@every 1m" };
+
 import { getStore } from "@netlify/blobs";
 
 function getWeekKey(date = new Date()) {
