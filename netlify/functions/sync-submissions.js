@@ -83,7 +83,7 @@ export default async (req) => {
       }
     }
 
-    const siteId = process.env.NETLIFY_SITE_ID;
+    const siteId = process.env.NETLIFY_SITE_ID; 
     if (!siteId) throw new Error("Missing NETLIFY_SITE_ID");
 
     const url = new URL(req.url);
@@ -95,7 +95,7 @@ export default async (req) => {
     const weekSinceISO = weekStartISO(week);
 
     // NOTE: we deleted clips-reset, so cutoff is optional but harmless if present
-    const cutoffISO = (await store.get(`cutoff:${week}`)) || "";
+    const cutoffISO = "";
     const sinceISO = cutoffISO && cutoffISO > weekSinceISO ? cutoffISO : weekSinceISO;
 
     const forms = await apiGet(`/sites/${siteId}/forms`);
