@@ -12,7 +12,6 @@ function getWeekKey(date = new Date()) {
 }
 
 function ipFromReq(req) {
-  // Prefer Netlify’s stable IP header
   return req.headers.get("x-nf-client-connection-ip") || "0.0.0.0";
 }
 
@@ -47,7 +46,7 @@ export default async (req) => {
     const ip = ipFromReq(req);
     const voteKey = `v:${week}:${clipId}:${stableHash(ip)}`;
 
-    // Treat ANY existing value as "already voted"
+    // If already voted, block
     const already = await store.get(voteKey);
     if (already) {
       return new Response(JSON.stringify({ ok: false, error: "Vote already counted recently. Try later." }), {
@@ -56,6 +55,10 @@ export default async (req) => {
       });
     }
 
+    // IMPORTANT: set the lock FIRST (prevents rapid double-click counting)
+    await store.set(voteKey, "1", { ttl: 60 * 60 * 12 });
+
+    // Now increment the vote
     const clipsKey = `clips:${week}`;
     const clips = await getJson(store, clipsKey, []);
 
@@ -71,7 +74,6 @@ export default async (req) => {
     clips[idx].lastVoteAt = new Date().toISOString();
 
     await store.set(clipsKey, JSON.stringify(clips));
-    await store.set(voteKey, "1", { ttl: 60 * 60 * 12 });
 
     return new Response(JSON.stringify({ ok: true, week, clipId, votes: clips[idx].votes }), {
       status: 200,
