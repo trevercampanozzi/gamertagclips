@@ -142,7 +142,7 @@
     <div class="grid" id="grid"></div>
 
     <div class="footer">
-      Voting is rate-limited per clip per IP. Next upgrades: scheduled sync + stronger bot protection (Turnstile).
+      Voting is rate-limited per clip per IP.
     </div>
   </div>
 
@@ -152,7 +152,6 @@
   const countPill = document.getElementById('countPill');
   const statusPill = document.getElementById('statusPill');
 
-  // IMPORTANT: we must send the same week key that clips-get returns
   let CURRENT_WEEK = "";
 
   function esc(s){
@@ -253,14 +252,13 @@
         return;
       }
 
+      // show the server-confirmed vote count immediately
       msg.className = 'msg ok';
       msg.textContent = 'Vote counted ✅';
-      await loadClips();
+      if (countEl) countEl.textContent = String(Number(data.votes || 0));
 
-      // don’t guess locally—wait for the refresh
-
-      // keep button disabled after successful vote
-      // (rate limit is server-side anyway, this just prevents confusion)
+      // delayed refresh (gives blob read-after-write time)
+      setTimeout(() => loadClips(), 1500);
 
     } catch(e){
       msg.className = 'msg bad';
