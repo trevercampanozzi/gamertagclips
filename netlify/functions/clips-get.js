@@ -2,8 +2,8 @@ import { getStore } from "@netlify/blobs";
 
 function getWeekKey(date = new Date()) {
   const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-  const day = d.getUTCDay() || 7; // Sunday => 7
-  d.setUTCDate(d.getUTCDate() - (day - 1)); // back to Monday
+  const day = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() - (day - 1));
   const yyyy = d.getUTCFullYear();
   const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
   const dd = String(d.getUTCDate()).padStart(2, "0");
@@ -13,11 +13,9 @@ function getWeekKey(date = new Date()) {
 async function getJson(store, key, fallback) {
   const raw = await store.get(key);
   if (!raw) return fallback;
-
   try {
     return JSON.parse(raw);
   } catch {
-    // self-heal if bad data like "[object Object]" is stored
     await store.set(key, JSON.stringify(fallback));
     return fallback;
   }
@@ -31,9 +29,21 @@ export default async (req) => {
     const store = getStore("gtc");
     const clips = await getJson(store, `clips:${week}`, []);
 
-    clips.sort((a, b) => (b.votes || 0) - (a.votes || 0));
+    // attach per-clip votes (fallback to embedded votes if present)
+    const withVotes = await Promise.all(
+      clips.map(async (c) => {
+        const clipId = String(c.id);
+        const raw = await store.get(`votes:${week}:${clipId}`);
+        const votes = raw !== null && raw !== undefined && raw !== ""
+          ? (Number(raw) || 0)
+          : (Number(c.votes) || 0);
+        return { ...c, votes };
+      })
+    );
 
-    return new Response(JSON.stringify({ week, count: clips.length, clips }), {
+    withVotes.sort((a, b) => (b.votes || 0) - (a.votes || 0));
+
+    return new Response(JSON.stringify({ week, count: withVotes.length, clips: withVotes }), {
       status: 200,
       headers: {
         "content-type": "application/json; charset=utf-8",

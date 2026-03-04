@@ -19,12 +19,6 @@ function stableHash(str) {
   return crypto.createHash("sha256").update(str).digest("hex");
 }
 
-async function getJson(store, key, fallback) {
-  const raw = await store.get(key);
-  if (!raw) return fallback;
-  try { return JSON.parse(raw); } catch { return fallback; }
-}
-
 export default async (req) => {
   if (req.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
 
@@ -40,19 +34,13 @@ export default async (req) => {
       });
     }
 
-    if (!week) {
-      return new Response(JSON.stringify({ error: "Missing week" }), {
-        status: 400,
-        headers: { "content-type": "application/json; charset=utf-8" }
-      });
-    }
-
     const store = getStore("gtc");
 
+    // 1 vote per IP per clip per 12 hours
     const ip = ipFromReq(req);
-    const voteKey = `v:${week}:${clipId}:${stableHash(ip)}`;
+    const voteLockKey = `v:${week}:${clipId}:${stableHash(ip)}`;
 
-    const already = await store.get(voteKey);
+    const already = await store.get(voteLockKey);
     if (already) {
       return new Response(JSON.stringify({ ok: false, error: "Vote already counted recently. Try later." }), {
         status: 429,
@@ -61,25 +49,17 @@ export default async (req) => {
     }
 
     // lock first
-    await store.set(voteKey, "1", { ttl: 60 * 60 * 12 });
+    await store.set(voteLockKey, "1", { ttl: 60 * 60 * 12 });
 
-    const clipsKey = `clips:${week}`;
-    const clips = await getJson(store, clipsKey, []);
+    // store votes per clip (prevents overwriting other clips’ votes)
+    const votesKey = `votes:${week}:${clipId}`;
+    const raw = await store.get(votesKey);
+    const current = Number(raw || "0") || 0;
+    const next = current + 1;
 
-    const idx = clips.findIndex((c) => String(c.id) === clipId);
-    if (idx === -1) {
-      return new Response(JSON.stringify({ error: "Clip not found for this week" }), {
-        status: 404,
-        headers: { "content-type": "application/json; charset=utf-8" }
-      });
-    }
+    await store.set(votesKey, String(next));
 
-    clips[idx].votes = (clips[idx].votes || 0) + 1;
-    clips[idx].lastVoteAt = new Date().toISOString();
-
-    await store.set(clipsKey, JSON.stringify(clips));
-
-    return new Response(JSON.stringify({ ok: true, week, clipId, votes: clips[idx].votes }), {
+    return new Response(JSON.stringify({ ok: true, week, clipId, votes: next }), {
       status: 200,
       headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }
     });
