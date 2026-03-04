@@ -63,7 +63,14 @@
       </div>
 
       <!-- Netlify Form (JS submit to avoid Netlify generic success page) -->
-      <form id="clipForm" name="clip-submissions" method="POST" data-netlify="true" data-netlify-honeypot="bot-field">
+      <form
+        id="clipForm"
+        name="clip-submissions"
+        method="POST"
+        data-netlify="true"
+        data-netlify-honeypot="bot-field"
+        data-netlify-recaptcha="true"
+      >
         <input type="hidden" name="form-name" value="clip-submissions" />
         <p style="display:none">
           <label>Don’t fill this out: <input name="bot-field" /></label>
@@ -119,6 +126,11 @@
           <div class="row full">
             <label for="caption">Optional Caption</label>
             <textarea id="caption" name="caption" placeholder="Add context (optional)."></textarea>
+          </div>
+
+          <!-- Netlify-provided reCAPTCHA (one per page) -->
+          <div class="row full">
+            <div data-netlify-recaptcha="true"></div>
           </div>
 
           <div class="row full">
