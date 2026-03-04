@@ -255,6 +255,7 @@
 
       msg.className = 'msg ok';
       msg.textContent = 'Vote counted ✅';
+      setTimeout(() => window.location.reload(), 600);
 
       if (countEl) {
         countEl.textContent = String(data.votes ?? (Number(countEl.textContent || "0") + 1));
