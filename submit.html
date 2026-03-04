@@ -146,55 +146,65 @@
   </div>
 
   <script>
-    const form = document.getElementById("clipForm");
-    const successBox = document.getElementById("successBox");
-    const errorBox = document.getElementById("errorBox");
-    const submitBtn = document.getElementById("submitBtn");
+  const form = document.getElementById("clipForm");
+  const successBox = document.getElementById("successBox");
+  const errorBox = document.getElementById("errorBox");
+  const submitBtn = document.getElementById("submitBtn");
 
-    function showSuccess() {
-      errorBox.style.display = "none";
-      successBox.style.display = "block";
-      window.scrollTo({ top: 0, behavior: "smooth" });
+  function showSuccess() {
+    errorBox.style.display = "none";
+    successBox.style.display = "block";
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+  function showError(msg = "❌ Submission failed. Please try again.") {
+    successBox.style.display = "none";
+    errorBox.style.display = "block";
+    errorBox.textContent = msg;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    successBox.style.display = "none";
+    errorBox.style.display = "none";
+
+    // ✅ Hard block if captcha not completed
+    const captchaEl = form.querySelector('[name="g-recaptcha-response"]');
+    const captchaVal = captchaEl ? String(captchaEl.value || "").trim() : "";
+    if (!captchaVal) {
+      showError("❌ Please complete the captcha.");
+      return;
     }
-    function showError() {
-      successBox.style.display = "none";
-      errorBox.style.display = "block";
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
 
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Submitting…";
 
-      successBox.style.display = "none";
-      errorBox.style.display = "none";
-      submitBtn.disabled = true;
-      submitBtn.textContent = "Submitting…";
+    try {
+      const formData = new FormData(form);
 
-      try {
-        const formData = new FormData(form);
+      const postTo = "/submit";
 
-        // IMPORTANT: submit to the actual form page route, not "/"
-        const postTo = "/submit";
+      const res = await fetch(postTo, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams(formData).toString()
+      });
 
-        const res = await fetch(postTo, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams(formData).toString()
-        });
-
-        if (res.status === 200 || res.status === 201 || res.status === 204 || res.status === 302) {
-          form.reset();
-          showSuccess();
-        } else {
-          showError();
-        }
-      } catch (err) {
-        showError();
-      } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = "Submit Clip";
+      // ✅ Only success on a true 2xx response
+      if (res.ok) {
+        form.reset();
+        showSuccess();
+      } else {
+        showError("❌ Submission blocked. Please try again.");
       }
-    });
-  </script>
+    } catch (err) {
+      showError("❌ Submission failed. Please try again.");
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Submit Clip";
+    }
+  });
+</script>
 </body>
 </html>
