@@ -15,6 +15,7 @@
       --blue:#2d6cff;
       --green:#61ffb0;
       --red:#ff7a7a;
+      --gold:#ffd56a;
     }
     *{box-sizing:border-box}
     body{
@@ -30,6 +31,7 @@
       align-items:center;
       justify-content:space-between;
       gap:12px;
+      flex-wrap:wrap;
     }
     header strong{letter-spacing:.2px}
     nav a{
@@ -39,6 +41,7 @@
     }
     nav a:hover{text-decoration:underline}
     .wrap{max-width:1100px;margin:0 auto;padding:16px}
+
     .meta{
       display:flex;
       align-items:center;
@@ -56,18 +59,46 @@
       background:rgba(255,255,255,.07);
       border:1px solid rgba(255,255,255,.10);
       color:var(--text);
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
     }
+
+    .section-title{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      margin:16px 0 10px;
+      flex-wrap:wrap;
+    }
+    .section-title h2{
+      margin:0;
+      font-size:16px;
+      letter-spacing:.2px;
+    }
+    .section-title .hint{
+      opacity:.78;
+      font-size:12px;
+    }
+
     .grid{
       display:grid;
       grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
       gap:12px;
     }
+
     .card{
       background:var(--panel);
       border:1px solid rgba(255,255,255,.08);
       border-radius:14px;
       overflow:hidden;
     }
+    .card.leader{
+      border-color: rgba(255,213,106,.35);
+      box-shadow: 0 0 0 1px rgba(255,213,106,.08) inset;
+    }
+
     .thumb{
       width:100%;
       aspect-ratio:16/9;
@@ -81,6 +112,7 @@
       margin:0 0 6px;
       font-size:16px;
       line-height:1.2;
+      word-break:break-word;
     }
     .sub{
       opacity:.82;
@@ -92,6 +124,11 @@
       align-items:center;
       justify-content:space-between;
       gap:10px;
+      flex-wrap:wrap;
+    }
+    .rank{
+      font-weight:900;
+      color:var(--gold);
     }
     button{
       background:var(--blue);
@@ -139,7 +176,19 @@
       <span class="pill" id="statusPill">Loading…</span>
     </div>
 
-    <div class="grid" id="grid"></div>
+    <!-- TOP 10 -->
+    <div class="section-title">
+      <h2>🏆 Top 10 This Week</h2>
+      <div class="hint">Automatically updates — if #11 beats #10, it bumps into the Top 10.</div>
+    </div>
+    <div class="grid" id="topGrid"></div>
+
+    <!-- ALL CLIPS -->
+    <div class="section-title">
+      <h2>🗂️ All Clips (Newest First)</h2>
+      <div class="hint">New submissions show here immediately.</div>
+    </div>
+    <div class="grid" id="allGrid"></div>
 
     <div class="footer">
       Voting is rate-limited per clip per IP.
@@ -147,10 +196,12 @@
   </div>
 
 <script>
-  const grid = document.getElementById('grid');
   const weekPill = document.getElementById('weekPill');
   const countPill = document.getElementById('countPill');
   const statusPill = document.getElementById('statusPill');
+
+  const topGrid = document.getElementById('topGrid');
+  const allGrid = document.getElementById('allGrid');
 
   let CURRENT_WEEK = "";
 
@@ -165,9 +216,70 @@
     if(kind === 'bad') statusPill.style.borderColor = 'rgba(255,122,122,.35)';
   }
 
+  function toMs(d){
+    const t = Date.parse(d);
+    return Number.isFinite(t) ? t : 0;
+  }
+
+  function normalizeClip(c){
+    return {
+      id: c.id,
+      title: c.title || 'Untitled Clip',
+      gamerTag: c.gamerTag || c.gamertag || '',
+      game: c.game || '',
+      votes: Number(c.votes || 0),
+      submittedAt: c.submittedAt || c.createdAt || '',
+      thumbUrl: c.thumbUrl || c.thumbnail || '',
+      clipUrl: c.clipUrl || c.url || ''
+    };
+  }
+
+  function renderCard(c, opts){
+    const id = esc(c.id);
+    const title = esc(c.title);
+    const gamerTag = esc(c.gamerTag);
+    const game = esc(c.game);
+    const votes = Number(c.votes || 0);
+
+    const thumbUrl = c.thumbUrl || '';
+    const clipUrl = c.clipUrl || '';
+
+    const rankHtml = opts && opts.rank ? `<span class="pill"><span class="rank">#${opts.rank}</span></span>` : '';
+    const leaderClass = opts && opts.leader ? 'leader' : '';
+
+    const el = document.createElement('div');
+    el.className = `card ${leaderClass}`.trim();
+    el.innerHTML = `
+      ${thumbUrl ? `<img class="thumb" src="${esc(thumbUrl)}" alt="${title}">` : `<div class="thumb"></div>`}
+      <div class="pad">
+        <p class="title">${title}</p>
+        <p class="sub">${[gamerTag && `@${gamerTag}`, game].filter(Boolean).join(' • ')}</p>
+
+        <div class="row">
+          <span class="pill">
+            ${rankHtml}
+            <strong class="voteCount">${votes}</strong> vote(s)
+          </span>
+          <button data-id="${id}">Vote</button>
+        </div>
+
+        ${clipUrl ? `<div class="msg"><a class="link" href="${esc(clipUrl)}" target="_blank" rel="noopener">Watch clip →</a></div>` : ``}
+        <div class="msg" id="m-${id}"></div>
+      </div>
+    `;
+    return el;
+  }
+
+  function wireVotes(container){
+    container.querySelectorAll('button[data-id]').forEach(btn => {
+      btn.addEventListener('click', () => vote(btn));
+    });
+  }
+
   async function loadClips(){
     setStatus('Loading…', null);
-    grid.innerHTML = '';
+    topGrid.innerHTML = '';
+    allGrid.innerHTML = '';
 
     const res = await fetch('/.netlify/functions/clips-get', { cache: 'no-store' });
     const data = await res.json();
@@ -178,7 +290,8 @@
 
     if (!data.clips || !data.clips.length) {
       setStatus('No clips yet', 'bad');
-      grid.innerHTML = `
+
+      topGrid.innerHTML = `
         <div class="card">
           <div class="pad">
             <p class="title">No clips yet</p>
@@ -187,44 +300,44 @@
           </div>
         </div>
       `;
+      allGrid.innerHTML = topGrid.innerHTML;
       return;
     }
 
     setStatus('Ready to vote', 'ok');
 
-    data.clips.forEach(c => {
-      const id = esc(c.id);
-      const title = esc(c.title || 'Untitled Clip');
-      const gamerTag = esc(c.gamerTag || c.gamertag || '');
-      const game = esc(c.game || '');
-      const votes = Number(c.votes || 0);
+    const clips = data.clips.map(normalizeClip);
 
-      const thumbUrl = c.thumbUrl || c.thumbnail || '';
-      const clipUrl = c.clipUrl || c.url || '';
+    // Top 10: votes desc, tie-breaker newer submission wins
+    const top10 = [...clips].sort((a,b) => {
+      const dv = (Number(b.votes)||0) - (Number(a.votes)||0);
+      if(dv !== 0) return dv;
+      return toMs(b.submittedAt) - toMs(a.submittedAt);
+    }).slice(0, 10);
 
-      const el = document.createElement('div');
-      el.className = 'card';
-      el.innerHTML = `
-        ${thumbUrl ? `<img class="thumb" src="${esc(thumbUrl)}" alt="${title}">` : `<div class="thumb"></div>`}
-        <div class="pad">
-          <p class="title">${title}</p>
-          <p class="sub">${[gamerTag && `@${gamerTag}`, game].filter(Boolean).join(' • ')}</p>
-
-          <div class="row">
-            <span class="pill"><strong class="voteCount">${votes}</strong> vote(s)</span>
-            <button data-id="${id}">Vote</button>
-          </div>
-
-          ${clipUrl ? `<div class="msg"><a class="link" href="${esc(clipUrl)}" target="_blank" rel="noopener">Watch clip →</a></div>` : ``}
-          <div class="msg" id="m-${id}"></div>
-        </div>
-      `;
-      grid.appendChild(el);
+    // All clips: newest first (so new submissions show immediately)
+    const allSorted = [...clips].sort((a,b) => {
+      const ds = toMs(b.submittedAt) - toMs(a.submittedAt);
+      if(ds !== 0) return ds;
+      return (Number(b.votes)||0) - (Number(a.votes)||0);
     });
 
-    grid.querySelectorAll('button[data-id]').forEach(btn => {
-      btn.addEventListener('click', () => vote(btn));
+    // Render Top 10
+    topGrid.innerHTML = '';
+    top10.forEach((c, i) => {
+      const el = renderCard(c, { rank: i + 1, leader: true });
+      topGrid.appendChild(el);
     });
+
+    // Render All
+    allGrid.innerHTML = '';
+    allSorted.forEach(c => {
+      const el = renderCard(c, { leader: false });
+      allGrid.appendChild(el);
+    });
+
+    wireVotes(topGrid);
+    wireVotes(allGrid);
   }
 
   async function vote(btn){
@@ -252,12 +365,12 @@
         return;
       }
 
-      // show the server-confirmed vote count immediately
       msg.className = 'msg ok';
       msg.textContent = 'Vote counted ✅';
       if (countEl) countEl.textContent = String(Number(data.votes || 0));
 
-      // delayed refresh (gives blob read-after-write time)
+      // Re-load to re-rank Top 10 / All lists (keeps leaderboard accurate)
+      setTimeout(loadClips, 650);
 
     } catch(e){
       msg.className = 'msg bad';
