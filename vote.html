@@ -258,7 +258,6 @@
       if (countEl) countEl.textContent = String(Number(data.votes || 0));
 
       // delayed refresh (gives blob read-after-write time)
-      setTimeout(() => loadClips(), 1500);
 
     } catch(e){
       msg.className = 'msg bad';
