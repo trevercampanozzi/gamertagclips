@@ -176,17 +176,17 @@
       <span class="pill" id="statusPill">Loading…</span>
     </div>
 
-    <!-- TOP 10 -->
+    <!-- TOP 3 -->
     <div class="section-title">
-      <h2>🏆 Top 10 This Week</h2>
-      <div class="hint">Auto-updates — if #11 beats #10, it bumps into the Top 10.</div>
+      <h2>🥇🥈🥉 Top 3 This Week</h2>
+      <div class="hint">Highest votes (ties break by newest submission).</div>
     </div>
     <div class="grid" id="topGrid"></div>
 
-    <!-- ALL CLIPS (EXCLUDING TOP 10) -->
+    <!-- ALL CLIPS (EXCLUDING TOP 3) -->
     <div class="section-title">
       <h2>🗂️ All Clips (Newest First)</h2>
-      <div class="hint" id="allHint">Excludes the Top 10 so nothing is duplicated.</div>
+      <div class="hint" id="allHint">Excludes the Top 3 so nothing is duplicated.</div>
     </div>
     <div class="grid" id="allGrid"></div>
 
@@ -205,6 +205,11 @@
   const allHint = document.getElementById('allHint');
 
   let CURRENT_WEEK = "";
+
+  // local cache so we can update vote counts without reloading + flicker
+  let CLIPS_BY_ID = new Map();
+  // local “already voted this session” memory
+  let VOTED_THIS_SESSION = new Set();
 
   function esc(s){
     return String(s||"").replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m]));
@@ -251,6 +256,8 @@
 
     const leaderClass = (opts && opts.leader) ? 'leader' : '';
 
+    const disabledAttr = VOTED_THIS_SESSION.has(String(c.id)) ? 'disabled' : '';
+
     const el = document.createElement('div');
     el.className = `card ${leaderClass}`.trim();
     el.innerHTML = `
@@ -262,9 +269,9 @@
         <div class="row">
           <span class="pill">
             ${rankHtml}
-            <strong class="voteCount">${votes}</strong> vote(s)
+            <strong class="voteCount" id="vc-${id}">${votes}</strong> vote(s)
           </span>
-          <button data-id="${id}">Vote</button>
+          <button data-id="${id}" ${disabledAttr}>Vote</button>
         </div>
 
         ${clipUrl ? `<div class="msg"><a class="link" href="${esc(clipUrl)}" target="_blank" rel="noopener">Watch clip →</a></div>` : ``}
@@ -284,7 +291,7 @@
     setStatus('Loading…', null);
     topGrid.innerHTML = '';
     allGrid.innerHTML = '';
-    allHint.textContent = 'Excludes the Top 10 so nothing is duplicated.';
+    allHint.textContent = 'Excludes the Top 3 so nothing is duplicated.';
 
     const res = await fetch('/.netlify/functions/clips-get', { cache: 'no-store' });
     const data = await res.json();
@@ -314,17 +321,20 @@
 
     const clips = data.clips.map(normalizeClip);
 
-    // Top 10: votes desc, tie-breaker newer wins
-    const top10 = [...clips].sort((a,b) => {
+    // refresh local cache
+    CLIPS_BY_ID = new Map();
+    clips.forEach(c => CLIPS_BY_ID.set(String(c.id), c));
+
+    // Top 3: votes desc, tie-breaker newer wins
+    const top3 = [...clips].sort((a,b) => {
       const dv = (Number(b.votes)||0) - (Number(a.votes)||0);
       if(dv !== 0) return dv;
       return toMs(b.submittedAt) - toMs(a.submittedAt);
-    }).slice(0, 10);
+    }).slice(0, 3);
 
-    // Build a set of Top 10 ids so we can exclude them below
-    const topIds = new Set(top10.map(c => String(c.id)));
+    const topIds = new Set(top3.map(c => String(c.id)));
 
-    // All clips: newest first, EXCLUDING Top 10
+    // All clips: newest first, EXCLUDING Top 3
     const allSorted = [...clips]
       .filter(c => !topIds.has(String(c.id)))
       .sort((a,b) => {
@@ -333,33 +343,56 @@
         return (Number(b.votes)||0) - (Number(a.votes)||0);
       });
 
-    allHint.textContent = `Excludes the Top 10 so nothing is duplicated. (${allSorted.length} clip${allSorted.length===1?'':'s'} below)`;
+    allHint.textContent = `Excludes the Top 3 so nothing is duplicated. (${allSorted.length} clip${allSorted.length===1?'':'s'} below)`;
 
-    // Render Top 10
+    // render
     topGrid.innerHTML = '';
-    top10.forEach((c, i) => {
-      topGrid.appendChild(renderCard(c, { rank: i + 1, leader: true }));
-    });
+    top3.forEach((c, i) => topGrid.appendChild(renderCard(c, { rank: i + 1, leader: true })));
 
-    // Render All
     allGrid.innerHTML = '';
-    allSorted.forEach(c => {
-      allGrid.appendChild(renderCard(c, { leader: false }));
-    });
+    allSorted.forEach(c => allGrid.appendChild(renderCard(c, { leader: false })));
 
     wireVotes(topGrid);
     wireVotes(allGrid);
   }
 
+  function setMsg(clipId, text, kind){
+    const msg = document.getElementById(`m-${clipId}`);
+    if(!msg) return;
+    msg.className = 'msg ' + (kind === 'ok' ? 'ok' : (kind === 'bad' ? 'bad' : ''));
+    msg.textContent = text || '';
+  }
+
+  function setVoteCount(clipId, votes){
+    const el = document.getElementById(`vc-${clipId}`);
+    if(el) el.textContent = String(Number(votes || 0));
+  }
+
+  function disableAllVoteButtonsForClip(clipId){
+    document.querySelectorAll(`button[data-id="${CSS.escape(String(clipId))}"]`).forEach(b => {
+      b.disabled = true;
+    });
+  }
+
   async function vote(btn){
     const clipId = btn.getAttribute('data-id');
-    const card = btn.closest('.card');
-    const countEl = card ? card.querySelector('.voteCount') : null;
-    const msg = document.getElementById(`m-${clipId}`);
+    if(!clipId) return;
 
-    msg.textContent = '';
-    msg.className = 'msg';
-    btn.disabled = true;
+    if(VOTED_THIS_SESSION.has(String(clipId))){
+      setMsg(clipId, 'Vote already counted recently. Try later.', 'bad');
+      disableAllVoteButtonsForClip(clipId);
+      return;
+    }
+
+    // optimistic UI
+    const clip = CLIPS_BY_ID.get(String(clipId));
+    const before = clip ? Number(clip.votes || 0) : Number(document.getElementById(`vc-${clipId}`)?.textContent || 0);
+    const optimistic = before + 1;
+
+    setVoteCount(clipId, optimistic);
+    setMsg(clipId, 'Counting vote…', null);
+
+    disableAllVoteButtonsForClip(clipId);
 
     try{
       const res = await fetch('/.netlify/functions/vote-post', {
@@ -370,23 +403,48 @@
       const data = await res.json();
 
       if (!res.ok || data.ok === false) {
-        msg.className = 'msg bad';
-        msg.textContent = data.error || 'Vote failed';
-        btn.disabled = false;
+        // rollback
+        setVoteCount(clipId, before);
+        setMsg(clipId, data.error || 'Vote failed', 'bad');
+
+        // If it’s an “already counted” limiter, keep it disabled
+        if(String(data.error || '').toLowerCase().includes('already')){
+          VOTED_THIS_SESSION.add(String(clipId));
+          disableAllVoteButtonsForClip(clipId);
+        } else {
+          // allow retry after short pause
+          setTimeout(() => {
+            document.querySelectorAll(`button[data-id="${CSS.escape(String(clipId))}"]`).forEach(b => {
+              b.disabled = false;
+            });
+          }, 1200);
+        }
         return;
       }
 
-      msg.className = 'msg ok';
-      msg.textContent = 'Vote counted ✅';
-      if (countEl) countEl.textContent = String(Number(data.votes || 0));
+      // success: lock it in
+      const serverVotes = (data.votes != null) ? Number(data.votes) : optimistic;
+      if(clip) clip.votes = serverVotes;
 
-      // reload so Top 10 / All re-ranks correctly
-      setTimeout(loadClips, 650);
+      setVoteCount(clipId, serverVotes);
+      setMsg(clipId, 'Vote counted ✅', 'ok');
+
+      VOTED_THIS_SESSION.add(String(clipId));
+      disableAllVoteButtonsForClip(clipId);
+
+      // no reload = no flicker
 
     } catch(e){
-      msg.className = 'msg bad';
-      msg.textContent = 'Vote failed. Try again.';
-      btn.disabled = false;
+      // rollback
+      setVoteCount(clipId, before);
+      setMsg(clipId, 'Vote failed. Try again.', 'bad');
+
+      // allow retry after short pause
+      setTimeout(() => {
+        document.querySelectorAll(`button[data-id="${CSS.escape(String(clipId))}"]`).forEach(b => {
+          b.disabled = false;
+        });
+      }, 1200);
     }
   }
 
