@@ -39,20 +39,17 @@ function normalizeClipUrl(raw) {
   try {
     const u = new URL(clipUrl);
 
-    // normalize host
     let host = u.hostname.toLowerCase();
     if (host.startsWith("www.")) host = host.slice(4);
 
-    // normalize query noise
+    // normalize youtube tracking params that cause "duplicates"
     if (host.includes("youtube.com") || host.includes("youtu.be")) {
-      // Remove tracking param that changes but points to same clip
       u.searchParams.delete("si");
       u.searchParams.delete("feature");
     }
 
     u.hostname = host;
 
-    // remove trailing slash
     const s = u.toString();
     return s.endsWith("/") ? s.slice(0, -1) : s;
   } catch {
@@ -147,13 +144,14 @@ export default async (req) => {
       return created >= sinceISO;
     });
 
-    // Build a set of existing normalized URLs to prevent duplicates
+    // Existing clips (used for dedupe + vote preservation)
     const existing = await getJson(store, clipsKey, []);
     const existingUrlSet = new Set(
-      existing
-        .map(c => normalizeClipUrl(c.clipUrl || ""))
-        .filter(Boolean)
+      existing.map(c => normalizeClipUrl(c.clipUrl || "")).filter(Boolean)
     );
+
+    // ✅ Dedupe within this fetch batch too
+    const batchUrlSet = new Set();
 
     const mapped = weeklySubs.map((s) => {
       const data = s.data || {};
@@ -164,8 +162,12 @@ export default async (req) => {
       // skip empty links
       if (!clipUrl) return null;
 
-      // skip duplicates (same video URL)
+      // skip duplicates already in the store
       if (existingUrlSet.has(clipUrl)) return null;
+
+      // skip duplicates inside this fetch batch
+      if (batchUrlSet.has(clipUrl)) return null;
+      batchUrlSet.add(clipUrl);
 
       let thumbUrl = escTrim(pick(data, ["thumbUrl", "thumb_url", "thumbnail", "thumbnailUrl"]));
       const title = escTrim(pick(data, ["title", "clipTitle", "clip_title"]));
@@ -191,13 +193,14 @@ export default async (req) => {
     // Merge into existing (preserve votes)
     const byId = new Map(existing.map(c => [String(c.id), c]));
 
-    let added = 0, updated = 0, skippedDuplicates = 0, skippedEmpty = 0;
+    let added = 0, updated = 0;
+    let skippedEmpty = 0, skippedDuplicates = 0;
 
     for (const s of weeklySubs) {
-      // count skips for visibility (best-effort)
       const data = s.data || {};
       const clipUrlRaw = pick(data, ["clipUrl", "clip_url", "url", "link"]);
       const clipUrl = normalizeClipUrl(clipUrlRaw);
+
       if (!clipUrl) skippedEmpty++;
       else if (existingUrlSet.has(clipUrl)) skippedDuplicates++;
     }
