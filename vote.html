@@ -255,11 +255,9 @@
 
       msg.className = 'msg ok';
       msg.textContent = 'Vote counted ✅';
-      setTimeout(() => window.location.reload(), 600);
+      await loadClips();
 
-      if (countEl) {
-        countEl.textContent = String(data.votes ?? (Number(countEl.textContent || "0") + 1));
-      }
+      // don’t guess locally—wait for the refresh
 
       // keep button disabled after successful vote
       // (rate limit is server-side anyway, this just prevents confusion)
