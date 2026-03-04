@@ -144,52 +144,37 @@ export default async (req) => {
       return created >= sinceISO;
     });
 
-    // Existing clips (used for dedupe + vote preservation)
-    const existing = await getJson(store, clipsKey, []);
-    const existingUrlSet = new Set(
-      existing.map(c => normalizeClipUrl(c.clipUrl || "")).filter(Boolean)
-    );
+// Existing clips (preserve votes and prevent reprocessing same submission)
+const existing = await getJson(store, clipsKey, []);
+const existingIdSet = new Set(existing.map(c => String(c.id)));
 
-    // ✅ Dedupe within this fetch batch too
-    const batchUrlSet = new Set();
+const mapped = weeklySubs.map((s) => {
+  const data = s.data || {};
 
-    const mapped = weeklySubs.map((s) => {
-      const data = s.data || {};
+  const clipUrl = escTrim(pick(data, ["clipUrl", "clip_url", "url", "link"]));
+  if (!clipUrl) return null;
 
-      const clipUrlRaw = pick(data, ["clipUrl", "clip_url", "url", "link"]);
-      const clipUrl = normalizeClipUrl(clipUrlRaw);
+  let thumbUrl = escTrim(pick(data, ["thumbUrl", "thumb_url", "thumbnail", "thumbnailUrl"]));
+  const title = escTrim(pick(data, ["title", "clipTitle", "clip_title"]));
+  const gamerTag = escTrim(pick(data, ["gamerTag", "gamertag", "gamer_tag"]));
+  const game = escTrim(pick(data, ["game", "gameTitle", "game_title"]));
 
-      // skip empty links
-      if (!clipUrl) return null;
+  if (!thumbUrl && (clipUrl.includes("youtube") || clipUrl.includes("youtu.be"))) {
+    thumbUrl = youtubeThumbFromUrl(clipUrl);
+  }
 
-      // skip duplicates already in the store
-      if (existingUrlSet.has(clipUrl)) return null;
-
-      // skip duplicates inside this fetch batch
-      if (batchUrlSet.has(clipUrl)) return null;
-      batchUrlSet.add(clipUrl);
-
-      let thumbUrl = escTrim(pick(data, ["thumbUrl", "thumb_url", "thumbnail", "thumbnailUrl"]));
-      const title = escTrim(pick(data, ["title", "clipTitle", "clip_title"]));
-      const gamerTag = escTrim(pick(data, ["gamerTag", "gamertag", "gamer_tag"]));
-      const game = escTrim(pick(data, ["game", "gameTitle", "game_title"]));
-
-      if (!thumbUrl && (clipUrl.includes("youtube.com") || clipUrl.includes("youtu.be"))) {
-        thumbUrl = youtubeThumbFromUrl(clipUrl);
-      }
-
-      return {
-        id: s.id,
-        title: title || "Submitted Clip",
-        gamerTag,
-        game,
-        clipUrl,
-        thumbUrl,
-        votes: 0,
-        submittedAt: s.created_at
-      };
-    }).filter(Boolean);
-
+  return {
+    id: s.id,
+    title: title || "Submitted Clip",
+    gamerTag,
+    game,
+    clipUrl,
+    thumbUrl,
+    votes: 0,
+    submittedAt: s.created_at
+  };
+}).filter(Boolean);
+    
     // Merge into existing (preserve votes)
     const byId = new Map(existing.map(c => [String(c.id), c]));
 
