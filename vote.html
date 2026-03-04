@@ -255,9 +255,8 @@
       if (countEl) countEl.textContent = String(data.votes ?? (Number(countEl.textContent || "0") + 1));
 
       // background refresh (keeps ordering accurate)
-      setTimeout(() => loadClips(), 1500);
-
-    } catch(e){
+    
+    } catch(e){ 
       msg.className = 'msg bad';
       msg.textContent = 'Vote failed. Try again.';
       btn.disabled = false;
