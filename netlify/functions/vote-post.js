@@ -31,7 +31,7 @@ export default async (req) => {
   try {
     const body = await req.json();
     const clipId = String(body.clipId || "").trim();
-    const week = String(body.week || "").trim(); // IMPORTANT: must be provided by client
+    const week = String(body.week || getWeekKey(new Date())).trim();
 
     if (!clipId) {
       return new Response(JSON.stringify({ error: "Missing clipId" }), {
