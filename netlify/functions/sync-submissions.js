@@ -32,6 +32,34 @@ async function getJson(store, key, fallback) {
   try { return JSON.parse(raw); } catch { return fallback; }
 }
 
+function normalizeClipUrl(raw) {
+  const clipUrl = escTrim(raw);
+  if (!clipUrl) return "";
+
+  try {
+    const u = new URL(clipUrl);
+
+    // normalize host
+    let host = u.hostname.toLowerCase();
+    if (host.startsWith("www.")) host = host.slice(4);
+
+    // normalize query noise
+    if (host.includes("youtube.com") || host.includes("youtu.be")) {
+      // Remove tracking param that changes but points to same clip
+      u.searchParams.delete("si");
+      u.searchParams.delete("feature");
+    }
+
+    u.hostname = host;
+
+    // remove trailing slash
+    const s = u.toString();
+    return s.endsWith("/") ? s.slice(0, -1) : s;
+  } catch {
+    return clipUrl;
+  }
+}
+
 function youtubeThumbFromUrl(clipUrl) {
   try {
     const u = new URL(clipUrl);
@@ -108,10 +136,9 @@ export default async (req) => {
       }), { status: 404, headers: { "content-type": "application/json; charset=utf-8" } });
     }
 
-    // ✅ Fetch verified + spam submissions (Akismet false positives won’t block your site)
+    // Fetch verified + spam submissions
     const verified = await apiGet(`/forms/${form.id}/submissions?per_page=100`);
     const spam = await apiGet(`/forms/${form.id}/submissions?per_page=100&state=spam`);
-
     const all = [...verified, ...spam];
 
     // Filter by effective sinceISO
@@ -120,16 +147,32 @@ export default async (req) => {
       return created >= sinceISO;
     });
 
+    // Build a set of existing normalized URLs to prevent duplicates
+    const existing = await getJson(store, clipsKey, []);
+    const existingUrlSet = new Set(
+      existing
+        .map(c => normalizeClipUrl(c.clipUrl || ""))
+        .filter(Boolean)
+    );
+
     const mapped = weeklySubs.map((s) => {
       const data = s.data || {};
 
-      const clipUrl = escTrim(pick(data, ["clipUrl", "clip_url", "url", "link"]));
+      const clipUrlRaw = pick(data, ["clipUrl", "clip_url", "url", "link"]);
+      const clipUrl = normalizeClipUrl(clipUrlRaw);
+
+      // skip empty links
+      if (!clipUrl) return null;
+
+      // skip duplicates (same video URL)
+      if (existingUrlSet.has(clipUrl)) return null;
+
       let thumbUrl = escTrim(pick(data, ["thumbUrl", "thumb_url", "thumbnail", "thumbnailUrl"]));
       const title = escTrim(pick(data, ["title", "clipTitle", "clip_title"]));
       const gamerTag = escTrim(pick(data, ["gamerTag", "gamertag", "gamer_tag"]));
       const game = escTrim(pick(data, ["game", "gameTitle", "game_title"]));
 
-      if (!thumbUrl && (clipUrl.includes("youtube") || clipUrl.includes("youtu.be"))) {
+      if (!thumbUrl && (clipUrl.includes("youtube.com") || clipUrl.includes("youtu.be"))) {
         thumbUrl = youtubeThumbFromUrl(clipUrl);
       }
 
@@ -143,13 +186,21 @@ export default async (req) => {
         votes: 0,
         submittedAt: s.created_at
       };
-    });
+    }).filter(Boolean);
 
     // Merge into existing (preserve votes)
-    const existing = await getJson(store, clipsKey, []);
     const byId = new Map(existing.map(c => [String(c.id), c]));
 
-    let added = 0, updated = 0;
+    let added = 0, updated = 0, skippedDuplicates = 0, skippedEmpty = 0;
+
+    for (const s of weeklySubs) {
+      // count skips for visibility (best-effort)
+      const data = s.data || {};
+      const clipUrlRaw = pick(data, ["clipUrl", "clip_url", "url", "link"]);
+      const clipUrl = normalizeClipUrl(clipUrlRaw);
+      if (!clipUrl) skippedEmpty++;
+      else if (existingUrlSet.has(clipUrl)) skippedDuplicates++;
+    }
 
     for (const c of mapped) {
       const id = String(c.id);
@@ -179,7 +230,9 @@ export default async (req) => {
       clipsBefore: existing.length,
       clipsAfter: merged.length,
       added,
-      updated
+      updated,
+      skippedEmpty,
+      skippedDuplicates
     }), {
       status: 200,
       headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }
