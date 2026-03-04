@@ -83,7 +83,7 @@ export default async (req) => {
       }
     }
 
-    const siteId = process.env.NETLIFY_SITE_ID; 
+    const siteId = process.env.NETLIFY_SITE_ID;
     if (!siteId) throw new Error("Missing NETLIFY_SITE_ID");
 
     const url = new URL(req.url);
@@ -93,32 +93,36 @@ export default async (req) => {
     const clipsKey = `clips:${week}`;
 
     const weekSinceISO = weekStartISO(week);
-
-    // NOTE: we deleted clips-reset, so cutoff is optional but harmless if present
-    const cutoffISO = "";
+    const cutoffISO = (await store.get(`cutoff:${week}`)) || "";
     const sinceISO = cutoffISO && cutoffISO > weekSinceISO ? cutoffISO : weekSinceISO;
 
+    // Find the form by name
     const forms = await apiGet(`/sites/${siteId}/forms`);
     const form = forms.find(f => f.name === "clip-submissions");
     if (!form) {
       return new Response(JSON.stringify({
         ok: false,
         error: "Form not found",
-        siteIdUsed: siteId,
-        contextUsed: process.env.CONTEXT || "",
+        detail: "No form named 'clip-submissions' found on this Netlify site.",
         foundForms: forms.map(f => f.name).slice(0, 50)
       }), { status: 404, headers: { "content-type": "application/json; charset=utf-8" } });
     }
 
-    const submissions = await apiGet(`/forms/${form.id}/submissions?per_page=100`);
+    // ✅ Fetch verified + spam submissions (Akismet false positives won’t block your site)
+    const verified = await apiGet(`/forms/${form.id}/submissions?per_page=100`);
+    const spam = await apiGet(`/forms/${form.id}/submissions?per_page=100&state=spam`);
 
-    const weeklySubs = submissions.filter(s => {
+    const all = [...verified, ...spam];
+
+    // Filter by effective sinceISO
+    const weeklySubs = all.filter(s => {
       const created = new Date(s.created_at).toISOString();
       return created >= sinceISO;
     });
 
     const mapped = weeklySubs.map((s) => {
       const data = s.data || {};
+
       const clipUrl = escTrim(pick(data, ["clipUrl", "clip_url", "url", "link"]));
       let thumbUrl = escTrim(pick(data, ["thumbUrl", "thumb_url", "thumbnail", "thumbnailUrl"]));
       const title = escTrim(pick(data, ["title", "clipTitle", "clip_title"]));
@@ -141,6 +145,7 @@ export default async (req) => {
       };
     });
 
+    // Merge into existing (preserve votes)
     const existing = await getJson(store, clipsKey, []);
     const byId = new Map(existing.map(c => [String(c.id), c]));
 
@@ -166,11 +171,10 @@ export default async (req) => {
     return new Response(JSON.stringify({
       ok: true,
       week,
-      siteIdUsed: siteId,
-      contextUsed: process.env.CONTEXT || "",
       form: { id: form.id, name: form.name },
       since: sinceISO,
-      submissionsFetched: submissions.length,
+      verifiedFetched: verified.length,
+      spamFetched: spam.length,
       submissionsThisWeek: weeklySubs.length,
       clipsBefore: existing.length,
       clipsAfter: merged.length,
