@@ -293,7 +293,9 @@
     allGrid.innerHTML = '';
     allHint.textContent = 'Excludes the Top 3 so nothing is duplicated.';
 
-    const res = await fetch('/.netlify/functions/clips-get', { cache: 'no-store' });
+    const res = await fetch(`/.netlify/functions/clips-get?t=${Date.now()}`, {
+  cache: "no-store"
+});
     const data = await res.json();
 
     CURRENT_WEEK = data.week || "";
