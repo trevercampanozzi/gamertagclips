@@ -1,4 +1,3 @@
-// /netlify/functions/clips-get.js
 import { getStore } from "@netlify/blobs";
 import { getCompetitionWindow } from "./_week.js";
 
@@ -9,6 +8,19 @@ function json(status, obj) {
   });
 }
 
+async function readClips(store, key) {
+  const raw = await store.get(key);
+  if (!raw) return [];
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    if (Array.isArray(parsed)) return parsed;
+    if (parsed && Array.isArray(parsed.clips)) return parsed.clips;
+    return [];
+  } catch {
+    return [];
+  }
+}
+
 export default async () => {
   const store = getStore("gtc");
   const w = getCompetitionWindow(new Date());
@@ -16,10 +28,12 @@ export default async () => {
   const clipsKey = `clips:${w.week}`;
   const stateKey = `state:${w.week}`;
 
-  const clipsDoc = await store.get(clipsKey, { type: "json" }).catch(() => null);
-  const clips = Array.isArray(clipsDoc?.clips) ? clipsDoc.clips : (Array.isArray(clipsDoc) ? clipsDoc : []);
+  const clips = await readClips(store, clipsKey);
 
-  const state = await store.get(stateKey, { type: "json" }).catch(() => null);
+  const stateRaw = await store.get(stateKey).catch(() => null);
+  let state = null;
+  try { state = stateRaw ? (typeof stateRaw === "string" ? JSON.parse(stateRaw) : stateRaw) : null; } catch {}
+
   const locked = state?.locked === true;
 
   return json(200, {
@@ -27,7 +41,6 @@ export default async () => {
     week: w.week,
     count: clips.length,
     clips,
-    // competition state
     isOpen: w.isOpen,
     isClosed: w.isClosed,
     weekStartUtcMs: w.weekStartUtcMs,

@@ -1,16 +1,6 @@
 import { getStore } from "@netlify/blobs";
 import { getCompetitionWindow } from "./_week.js";
 
-function getWeekKey(date = new Date()) {
-  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-  const day = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() - (day - 1));
-  const yyyy = d.getUTCFullYear();
-  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const dd = String(d.getUTCDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
-}
-
 function weekStartISO(weekKey) {
   return new Date(`${weekKey}T00:00:00.000Z`).toISOString();
 }
@@ -27,10 +17,19 @@ function pick(obj, keys) {
   return "";
 }
 
-async function getJson(store, key, fallback) {
+async function getClipsDoc(store, key) {
+  // Robust: handles old string format AND new object format
   const raw = await store.get(key);
-  if (!raw) return fallback;
-  try { return JSON.parse(raw); } catch { return fallback; }
+  if (!raw) return { clips: [] };
+
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    if (Array.isArray(parsed)) return { clips: parsed };
+    if (parsed && Array.isArray(parsed.clips)) return { clips: parsed.clips };
+    return { clips: [] };
+  } catch {
+    return { clips: [] };
+  }
 }
 
 function youtubeThumbFromUrl(clipUrl) {
@@ -88,7 +87,7 @@ export default async (req) => {
     const siteId = process.env.NETLIFY_SITE_ID;
     if (!siteId) throw new Error("Missing NETLIFY_SITE_ID");
 
-    // ✅ NEW: competition window guard (CST/CDT via America/Chicago)
+    // ✅ Competition window guard (CST/CDT)
     const w = getCompetitionWindow(new Date());
     if (!w.isOpen) {
       return new Response(JSON.stringify({
@@ -105,20 +104,17 @@ export default async (req) => {
     }
 
     const url = new URL(req.url);
-
-    // Use requested week only if explicitly provided; otherwise use the competition week (CST/CDT-based)
     const requestedWeek = url.searchParams.get("week") || "";
     const week = requestedWeek || w.week;
 
     const store = getStore("gtc");
     const clipsKey = `clips:${week}`;
 
-    // ✅ NEW: sinceISO aligned to your competition start time (Mon 3am CST/CDT) when using current week
+    // since aligned to competition start for current week
     const weekSinceISO = requestedWeek
       ? weekStartISO(week)
       : new Date(w.weekStartUtcMs).toISOString();
 
-    // reset cutoff support (if you ever use it)
     const cutoffISO = (await store.get(`cutoff:${week}`)) || "";
     const sinceISO = cutoffISO && cutoffISO > weekSinceISO ? cutoffISO : weekSinceISO;
 
@@ -139,22 +135,21 @@ export default async (req) => {
     const spam = await apiGet(`/forms/${form.id}/submissions?per_page=100&state=spam`);
     const all = [...verified, ...spam];
 
-    // Filter by effective sinceISO
+    // Filter by sinceISO
     const weeklySubs = all.filter(s => {
       const created = new Date(s.created_at).toISOString();
       return created >= sinceISO;
     });
 
-    // Existing clips (preserve votes + prevent re-adding the SAME submission ID)
-    const existing = await getJson(store, clipsKey, []);
-    const existingClips = Array.isArray(existing?.clips) ? existing.clips : (Array.isArray(existing) ? existing : []);
+    // Existing clips (preserve votes + prevent re-adding same submission ID)
+    const existingDoc = await getClipsDoc(store, clipsKey);
+    const existingClips = existingDoc.clips || [];
     const byId = new Map(existingClips.map(c => [String(c.id), c]));
 
     let added = 0, updated = 0, skippedEmpty = 0, skippedAlreadySynced = 0;
 
     for (const s of weeklySubs) {
       const data = s.data || {};
-
       const clipUrl = escTrim(pick(data, ["clipUrl", "clip_url", "url", "link"]));
       if (!clipUrl) { skippedEmpty++; continue; }
 
@@ -189,8 +184,8 @@ export default async (req) => {
     const merged = Array.from(byId.values());
     merged.sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0));
 
-    // Keep your storage format (stringified array) to match current system
-    await store.set(clipsKey, JSON.stringify(merged));
+    // ✅ IMPORTANT: store as OBJECT consistently
+    await store.set(clipsKey, { clips: merged }, { metadata: { updatedAt: new Date().toISOString() } });
 
     return new Response(JSON.stringify({
       ok: true,
