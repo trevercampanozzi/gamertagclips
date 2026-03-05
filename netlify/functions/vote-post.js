@@ -1,72 +1,63 @@
+// /netlify/functions/vote-post.js
 import { getStore } from "@netlify/blobs";
-import crypto from "crypto";
+import { getCompetitionWindow } from "./_week.js";
 
-function getWeekKey(date = new Date()) {
-  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-  const day = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() - (day - 1));
-  const yyyy = d.getUTCFullYear();
-  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const dd = String(d.getUTCDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
-}
-
-function ipFromReq(req) {
-  return req.headers.get("x-nf-client-connection-ip") || "0.0.0.0";
-}
-
-function stableHash(str) {
-  return crypto.createHash("sha256").update(str).digest("hex");
+function json(status, obj) {
+  return new Response(JSON.stringify(obj), {
+    status,
+    headers: { "content-type": "application/json", "cache-control": "no-store" },
+  });
 }
 
 export default async (req) => {
-  if (req.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
+  if (req.method !== "POST") return json(405, { ok: false, error: "Method not allowed" });
 
-  try {
-    const body = await req.json();
-    const clipId = String(body.clipId || "").trim();
-    const week = String(body.week || getWeekKey(new Date())).trim();
+  const store = getStore("gtc");
+  const w = getCompetitionWindow(new Date());
 
-    if (!clipId) {
-      return new Response(JSON.stringify({ error: "Missing clipId" }), {
-        status: 400,
-        headers: { "content-type": "application/json; charset=utf-8" }
-      });
-    }
-
-    const store = getStore("gtc");
-
-    // 1 vote per IP per clip per 12 hours
-    const ip = ipFromReq(req);
-    const voteLockKey = `v:${week}:${clipId}:${stableHash(ip)}`;
-
-    const already = await store.get(voteLockKey);
-    if (already) {
-      return new Response(JSON.stringify({ ok: false, error: "Vote already counted recently. Try later." }), {
-        status: 429,
-        headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }
-      });
-    }
-
-    // lock first
-    await store.set(voteLockKey, "1", { ttl: 60 * 60 * 12 });
-
-    // store votes per clip (prevents overwriting other clips’ votes)
-    const votesKey = `votes:${week}:${clipId}`;
-    const raw = await store.get(votesKey);
-    const current = Number(raw || "0") || 0;
-    const next = current + 1;
-
-    await store.set(votesKey, String(next));
-
-    return new Response(JSON.stringify({ ok: true, week, clipId, votes: next }), {
-      status: 200,
-      headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }
-    });
-  } catch (err) {
-    return new Response(JSON.stringify({ error: "vote-post failed", detail: String(err) }), {
-      status: 500,
-      headers: { "content-type": "application/json; charset=utf-8" }
-    });
+  // hard lock voting outside open window
+  if (!w.isOpen) {
+    return json(403, { ok: false, error: "Voting is closed" });
   }
+
+  const stateKey = `state:${w.week}`;
+  const state = await store.get(stateKey, { type: "json" }).catch(() => null);
+  if (state?.locked === true) {
+    return json(403, { ok: false, error: "Voting is closed" });
+  }
+
+  let body = {};
+  try { body = await req.json(); } catch {}
+
+  const clipId = String(body.clipId || "").trim();
+  if (!clipId) return json(400, { ok: false, error: "clipId required" });
+
+  const key = `clips:${w.week}`;
+  const clipsDoc = await store.get(key, { type: "json" }).catch(() => null);
+  const clips = Array.isArray(clipsDoc?.clips) ? clipsDoc.clips : (Array.isArray(clipsDoc) ? clipsDoc : []);
+
+  const idx = clips.findIndex((c) => String(c.id) === clipId);
+  if (idx === -1) return json(404, { ok: false, error: "Clip not found" });
+
+  // Simple per-IP limiter (same behavior as before, but reliable)
+  const ip =
+    req.headers.get("x-nf-client-connection-ip") ||
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    "unknown";
+
+  const limitKey = `vote:${w.week}:${clipId}:${ip}`;
+  const already = await store.get(limitKey, { type: "json" }).catch(() => null);
+  if (already?.voted) {
+    return json(429, { ok: false, error: "Vote already counted" });
+  }
+
+  // record vote limiter for 24h
+  await store.set(limitKey, { voted: true, at: new Date().toISOString() }, { ttl: 60 * 60 * 24 });
+
+  clips[idx].votes = Number(clips[idx].votes || 0) + 1;
+  clips[idx].lastVoteAt = new Date().toISOString();
+
+  await store.set(key, { clips }, { metadata: { updatedAt: new Date().toISOString() } });
+
+  return json(200, { ok: true, votes: clips[idx].votes });
 };

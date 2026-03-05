@@ -1,4 +1,5 @@
 import { getStore } from "@netlify/blobs";
+import { getCompetitionWindow } from "./_week.js";
 
 function getWeekKey(date = new Date()) {
   const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
@@ -87,14 +88,35 @@ export default async (req) => {
     const siteId = process.env.NETLIFY_SITE_ID;
     if (!siteId) throw new Error("Missing NETLIFY_SITE_ID");
 
+    // ✅ NEW: competition window guard (CST/CDT via America/Chicago)
+    const w = getCompetitionWindow(new Date());
+    if (!w.isOpen) {
+      return new Response(JSON.stringify({
+        ok: true,
+        skipped: true,
+        reason: "competition-closed",
+        week: w.week,
+        closeUtcMs: w.closeUtcMs,
+        nextWeekStartUtcMs: w.nextWeekStartUtcMs
+      }), {
+        status: 200,
+        headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }
+      });
+    }
+
     const url = new URL(req.url);
-    const week = url.searchParams.get("week") || getWeekKey(new Date());
+
+    // Use requested week only if explicitly provided; otherwise use the competition week (CST/CDT-based)
+    const requestedWeek = url.searchParams.get("week") || "";
+    const week = requestedWeek || w.week;
 
     const store = getStore("gtc");
     const clipsKey = `clips:${week}`;
 
-    // week boundary (Monday UTC)
-    const weekSinceISO = weekStartISO(week);
+    // ✅ NEW: sinceISO aligned to your competition start time (Mon 3am CST/CDT) when using current week
+    const weekSinceISO = requestedWeek
+      ? weekStartISO(week)
+      : new Date(w.weekStartUtcMs).toISOString();
 
     // reset cutoff support (if you ever use it)
     const cutoffISO = (await store.get(`cutoff:${week}`)) || "";
@@ -125,7 +147,8 @@ export default async (req) => {
 
     // Existing clips (preserve votes + prevent re-adding the SAME submission ID)
     const existing = await getJson(store, clipsKey, []);
-    const byId = new Map(existing.map(c => [String(c.id), c]));
+    const existingClips = Array.isArray(existing?.clips) ? existing.clips : (Array.isArray(existing) ? existing : []);
+    const byId = new Map(existingClips.map(c => [String(c.id), c]));
 
     let added = 0, updated = 0, skippedEmpty = 0, skippedAlreadySynced = 0;
 
@@ -166,6 +189,7 @@ export default async (req) => {
     const merged = Array.from(byId.values());
     merged.sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0));
 
+    // Keep your storage format (stringified array) to match current system
     await store.set(clipsKey, JSON.stringify(merged));
 
     return new Response(JSON.stringify({
@@ -176,7 +200,7 @@ export default async (req) => {
       verifiedFetched: verified.length,
       spamFetched: spam.length,
       submissionsThisWeek: weeklySubs.length,
-      clipsBefore: existing.length,
+      clipsBefore: existingClips.length,
       clipsAfter: merged.length,
       added,
       updated,

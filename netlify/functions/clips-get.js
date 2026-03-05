@@ -1,59 +1,41 @@
+// /netlify/functions/clips-get.js
 import { getStore } from "@netlify/blobs";
+import { getCompetitionWindow } from "./_week.js";
 
-function getWeekKey(date = new Date()) {
-  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-  const day = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() - (day - 1));
-  const yyyy = d.getUTCFullYear();
-  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const dd = String(d.getUTCDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
+function json(status, obj) {
+  return new Response(JSON.stringify(obj), {
+    status,
+    headers: { "content-type": "application/json", "cache-control": "no-store" },
+  });
 }
 
-async function getJson(store, key, fallback) {
-  const raw = await store.get(key);
-  if (!raw) return fallback;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    await store.set(key, JSON.stringify(fallback));
-    return fallback;
-  }
-}
+export default async () => {
+  const store = getStore("gtc");
+  const w = getCompetitionWindow(new Date());
 
-export default async (req) => {
-  try {
-    const url = new URL(req.url);
-    const week = url.searchParams.get("week") || getWeekKey(new Date());
+  const clipsKey = `clips:${w.week}`;
+  const stateKey = `state:${w.week}`;
 
-    const store = getStore("gtc");
-    const clips = await getJson(store, `clips:${week}`, []);
+  const clipsDoc = await store.get(clipsKey, { type: "json" }).catch(() => null);
+  const clips = Array.isArray(clipsDoc?.clips) ? clipsDoc.clips : (Array.isArray(clipsDoc) ? clipsDoc : []);
 
-    // attach per-clip votes (fallback to embedded votes if present)
-    const withVotes = await Promise.all(
-      clips.map(async (c) => {
-        const clipId = String(c.id);
-        const raw = await store.get(`votes:${week}:${clipId}`);
-        const votes = raw !== null && raw !== undefined && raw !== ""
-          ? (Number(raw) || 0)
-          : (Number(c.votes) || 0);
-        return { ...c, votes };
-      })
-    );
+  const state = await store.get(stateKey, { type: "json" }).catch(() => null);
+  const locked = state?.locked === true;
 
-    withVotes.sort((a, b) => (b.votes || 0) - (a.votes || 0));
-
-    return new Response(JSON.stringify({ week, count: withVotes.length, clips: withVotes }), {
-      status: 200,
-      headers: {
-        "content-type": "application/json; charset=utf-8",
-        "cache-control": "no-store"
-      }
-    });
-  } catch (err) {
-    return new Response(JSON.stringify({ error: "clips-get failed", detail: String(err) }), {
-      status: 500,
-      headers: { "content-type": "application/json; charset=utf-8" }
-    });
-  }
+  return json(200, {
+    ok: true,
+    week: w.week,
+    count: clips.length,
+    clips,
+    // competition state
+    isOpen: w.isOpen,
+    isClosed: w.isClosed,
+    weekStartUtcMs: w.weekStartUtcMs,
+    closeUtcMs: w.closeUtcMs,
+    nextWeekStartUtcMs: w.nextWeekStartUtcMs,
+    locked,
+    winner: locked ? (state.winner || null) : null,
+    top3Final: locked ? (state.top3 || []) : null,
+    tieBreaker: "earliest submission",
+  });
 };
