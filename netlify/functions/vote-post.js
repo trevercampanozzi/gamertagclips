@@ -8,17 +8,12 @@ function json(status, obj) {
   });
 }
 
-async function readClips(store, key) {
-  const raw = await store.get(key);
-  if (!raw) return [];
-  try {
-    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
-    if (Array.isArray(parsed)) return parsed;
-    if (parsed && Array.isArray(parsed.clips)) return parsed.clips;
-    return [];
-  } catch {
-    return [];
-  }
+async function readClipsDoc(store, key) {
+  const val = await store.get(key, { type: "json" }).catch(() => null);
+  if (!val) return { clips: [] };
+  if (Array.isArray(val)) return { clips: val };
+  if (val && Array.isArray(val.clips)) return { clips: val.clips };
+  return { clips: [] };
 }
 
 export default async (req) => {
@@ -30,9 +25,7 @@ export default async (req) => {
   if (!w.isOpen) return json(403, { ok: false, error: "Voting is closed" });
 
   const stateKey = `state:${w.week}`;
-  const stateRaw = await store.get(stateKey).catch(() => null);
-  let state = null;
-  try { state = stateRaw ? (typeof stateRaw === "string" ? JSON.parse(stateRaw) : stateRaw) : null; } catch {}
+  const state = await store.get(stateKey, { type: "json" }).catch(() => null);
   if (state?.locked === true) return json(403, { ok: false, error: "Voting is closed" });
 
   let body = {};
@@ -42,7 +35,8 @@ export default async (req) => {
   if (!clipId) return json(400, { ok: false, error: "clipId required" });
 
   const key = `clips:${w.week}`;
-  const clips = await readClips(store, key);
+  const doc = await readClipsDoc(store, key);
+  const clips = doc.clips || [];
 
   const idx = clips.findIndex((c) => String(c.id) === clipId);
   if (idx === -1) return json(404, { ok: false, error: "Clip not found" });
@@ -53,17 +47,16 @@ export default async (req) => {
     "unknown";
 
   const limitKey = `vote:${w.week}:${clipId}:${ip}`;
-  const alreadyRaw = await store.get(limitKey).catch(() => null);
-  let already = null;
-  try { already = alreadyRaw ? (typeof alreadyRaw === "string" ? JSON.parse(alreadyRaw) : alreadyRaw) : null; } catch {}
+  const already = await store.get(limitKey, { type: "json" }).catch(() => null);
   if (already?.voted) return json(429, { ok: false, error: "Vote already counted" });
 
-  await store.set(limitKey, { voted: true, at: new Date().toISOString() }, { ttl: 60 * 60 * 24 });
+  await store.setJSON(limitKey, { voted: true, at: new Date().toISOString() }, { metadata: {} });
 
   clips[idx].votes = Number(clips[idx].votes || 0) + 1;
   clips[idx].lastVoteAt = new Date().toISOString();
 
-  await store.set(key, { clips }, { metadata: { updatedAt: new Date().toISOString() } });
+  // ✅ IMPORTANT: persist correctly
+  await store.setJSON(key, { clips }, { metadata: { updatedAt: new Date().toISOString() } });
 
   return json(200, { ok: true, votes: clips[idx].votes });
 };

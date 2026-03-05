@@ -18,18 +18,12 @@ function pick(obj, keys) {
 }
 
 async function getClipsDoc(store, key) {
-  // Robust: handles old string format AND new object format
-  const raw = await store.get(key);
-  if (!raw) return { clips: [] };
-
-  try {
-    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
-    if (Array.isArray(parsed)) return { clips: parsed };
-    if (parsed && Array.isArray(parsed.clips)) return { clips: parsed.clips };
-    return { clips: [] };
-  } catch {
-    return { clips: [] };
-  }
+  // robust read for legacy formats
+  const val = await store.get(key, { type: "json" }).catch(() => null);
+  if (!val) return { clips: [] };
+  if (Array.isArray(val)) return { clips: val };
+  if (val && Array.isArray(val.clips)) return { clips: val.clips };
+  return { clips: [] };
 }
 
 function youtubeThumbFromUrl(clipUrl) {
@@ -115,7 +109,7 @@ export default async (req) => {
       ? weekStartISO(week)
       : new Date(w.weekStartUtcMs).toISOString();
 
-    const cutoffISO = (await store.get(`cutoff:${week}`)) || "";
+    const cutoffISO = (await store.get(`cutoff:${week}`, { type: "text" }).catch(() => "")) || "";
     const sinceISO = cutoffISO && cutoffISO > weekSinceISO ? cutoffISO : weekSinceISO;
 
     // Find the form by name
@@ -184,8 +178,8 @@ export default async (req) => {
     const merged = Array.from(byId.values());
     merged.sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0));
 
-    // ✅ IMPORTANT: store as OBJECT consistently
-    await store.set(clipsKey, { clips: merged }, { metadata: { updatedAt: new Date().toISOString() } });
+    // ✅ IMPORTANT: persist correctly
+    await store.setJSON(clipsKey, { clips: merged }, { metadata: { updatedAt: new Date().toISOString() } });
 
     return new Response(JSON.stringify({
       ok: true,
