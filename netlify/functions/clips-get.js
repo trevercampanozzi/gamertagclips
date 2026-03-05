@@ -9,16 +9,24 @@ function json(status, obj) {
 }
 
 async function readClips(store, key) {
-  const raw = await store.get(key);
-  if (!raw) return [];
+  // ✅ Always ask blobs for JSON when possible
+  const val = await store.get(key, { type: "json" }).catch(() => null);
+  if (!val) return [];
+
+  // val could be: {clips:[...]} OR [...] depending on old/new writes
+  if (Array.isArray(val)) return val;
+  if (val && Array.isArray(val.clips)) return val.clips;
+
+  // fallback if something weird got stored
   try {
-    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
-    if (Array.isArray(parsed)) return parsed;
-    if (parsed && Array.isArray(parsed.clips)) return parsed.clips;
-    return [];
-  } catch {
-    return [];
-  }
+    if (typeof val === "string") {
+      const parsed = JSON.parse(val);
+      if (Array.isArray(parsed)) return parsed;
+      if (parsed && Array.isArray(parsed.clips)) return parsed.clips;
+    }
+  } catch {}
+
+  return [];
 }
 
 export default async () => {
@@ -30,10 +38,7 @@ export default async () => {
 
   const clips = await readClips(store, clipsKey);
 
-  const stateRaw = await store.get(stateKey).catch(() => null);
-  let state = null;
-  try { state = stateRaw ? (typeof stateRaw === "string" ? JSON.parse(stateRaw) : stateRaw) : null; } catch {}
-
+  const state = await store.get(stateKey, { type: "json" }).catch(() => null);
   const locked = state?.locked === true;
 
   return json(200, {
@@ -47,8 +52,8 @@ export default async () => {
     closeUtcMs: w.closeUtcMs,
     nextWeekStartUtcMs: w.nextWeekStartUtcMs,
     locked,
-    winner: locked ? (state.winner || null) : null,
-    top3Final: locked ? (state.top3 || []) : null,
+    winner: locked ? (state?.winner || null) : null,
+    top3Final: locked ? (state?.top3 || []) : null,
     tieBreaker: "earliest submission",
   });
 };
