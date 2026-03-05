@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Admin | GamerTagClips</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{--bg:#0f1117;--card:#151a24;--border:#232a3a;--text:#fff;--muted:#b6c0d0;--good:#22c55e;--bad:#ef4444;--btn:#2563eb;--btn2:#0b1220}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--text)}
+    .wrap{max-width:980px;margin:0 auto;padding:26px 16px 60px}
+    h1{margin:0 0 8px;font-size:22px}
+    .sub{color:var(--muted);margin:0 0 18px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;margin:12px 0}
+    label{display:block;font-size:13px;color:var(--muted);margin:10px 0 6px}
+    input{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--btn2);color:var(--text);outline:none}
+    button{background:var(--btn);color:#fff;border:0;border-radius:12px;padding:10px 12px;font-weight:800;cursor:pointer}
+    button.secondary{background:#334155}
+    button.danger{background:#b91c1c}
+    button:disabled{opacity:.55;cursor:not-allowed}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .msg{margin-top:10px;font-size:14px}
+    .good{color:var(--good)} .bad{color:var(--bad)}
+    code{background:#0b1220;border:1px solid var(--border);padding:2px 6px;border-radius:8px}
+    .keys{white-space:pre-wrap;font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;color:var(--muted);font-size:12px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Admin Dashboard</h1>
+    <p class="sub">Protected admin tools for GamerTagClips. Requires password.</p>
+
+    <div class="card" id="loginCard">
+      <h2 style="margin:0 0 10px;font-size:16px;">Login</h2>
+      <label>Admin Password</label>
+      <input id="pw" type="password" placeholder="Enter admin password" />
+      <div class="row" style="margin-top:10px;">
+        <button id="loginBtn">Login</button>
+        <span id="loginMsg" class="msg"></span>
+      </div>
+    </div>
+
+    <div class="card" id="toolsCard" style="display:none;">
+      <h2 style="margin:0 0 10px;font-size:16px;">Tools</h2>
+
+      <div class="row">
+        <button id="listWeeksBtn" class="secondary">List weeks</button>
+        <button id="resetWeekBtn" class="danger">Reset current week</button>
+        <button id="purgeAllBtn" class="danger">Purge ALL weeks</button>
+      </div>
+
+      <label style="margin-top:14px;">Delete a clip (by ID)</label>
+      <div class="row">
+        <input id="clipId" type="text" placeholder="clip id (example: 69a8991ca724ce4fcd594266)" />
+        <input id="week" type="text" placeholder="week YYYY-MM-DD (optional)" />
+        <button id="deleteClipBtn" class="secondary">Delete clip</button>
+      </div>
+
+      <div id="toolsMsg" class="msg"></div>
+      <div id="weeksOut" class="keys"></div>
+    </div>
+  </div>
+
+<script>
+  const loginCard = document.getElementById('loginCard');
+  const toolsCard = document.getElementById('toolsCard');
+
+  const pw = document.getElementById('pw');
+  const loginBtn = document.getElementById('loginBtn');
+  const loginMsg = document.getElementById('loginMsg');
+
+  const toolsMsg = document.getElementById('toolsMsg');
+  const weeksOut = document.getElementById('weeksOut');
+
+  const listWeeksBtn = document.getElementById('listWeeksBtn');
+  const resetWeekBtn = document.getElementById('resetWeekBtn');
+  const purgeAllBtn = document.getElementById('purgeAllBtn');
+
+  const clipId = document.getElementById('clipId');
+  const week = document.getElementById('week');
+  const deleteClipBtn = document.getElementById('deleteClipBtn');
+
+  let token = localStorage.getItem('gtc_admin_token') || '';
+
+  function setMsg(el, text, kind){
+    el.textContent = text || '';
+    el.className = 'msg ' + (kind === 'good' ? 'good' : (kind === 'bad' ? 'bad' : ''));
+  }
+
+  function showTools(){
+    loginCard.style.display = token ? 'none' : '';
+    toolsCard.style.display = token ? '' : 'none';
+  }
+
+  async function api(path, method='GET', body=null){
+    const opts = { method, headers: { 'cache-control':'no-store' } };
+    if (token) opts.headers['authorization'] = 'Bearer ' + token;
+    if (body) {
+      opts.headers['content-type'] = 'application/json';
+      opts.body = JSON.stringify(body);
+    }
+    const res = await fetch(path, opts);
+    const data = await res.json().catch(() => ({}));
+    return { res, data };
+  }
+
+  async function login(){
+    setMsg(loginMsg, 'Logging in…', '');
+    const { res, data } = await api('/.netlify/functions/admin-login', 'POST', { password: pw.value });
+    if (!res.ok || !data.ok) {
+      setMsg(loginMsg, data.error || 'Login failed', 'bad');
+      return;
+    }
+    token = data.token;
+    localStorage.setItem('gtc_admin_token', token);
+    setMsg(loginMsg, 'Logged in ✅', 'good');
+    showTools();
+  }
+
+  loginBtn.addEventListener('click', login);
+  pw.addEventListener('keydown', (e) => { if (e.key === 'Enter') login(); });
+
+  listWeeksBtn.addEventListener('click', async () => {
+    setMsg(toolsMsg, 'Loading weeks…', '');
+    const { res, data } = await api('/.netlify/functions/admin-list-weeks', 'GET');
+    if (!res.ok || !data.ok) return setMsg(toolsMsg, data.error || 'Failed', 'bad');
+    setMsg(toolsMsg, `Found ${data.count} week keys`, 'good');
+    weeksOut.textContent = (data.keys || []).join('\n');
+  });
+
+  resetWeekBtn.addEventListener('click', async () => {
+    if (!confirm('Reset current week? This deletes ALL clips for the current week.')) return;
+    setMsg(toolsMsg, 'Resetting current week…', '');
+    const { res, data } = await api('/.netlify/functions/admin-reset-week', 'POST', {});
+    if (!res.ok || !data.ok) return setMsg(toolsMsg, data.error || 'Failed', 'bad');
+    setMsg(toolsMsg, `Deleted: ${data.deletedKey}`, 'good');
+  });
+
+  purgeAllBtn.addEventListener('click', async () => {
+    const typed = prompt('Type PURGE to delete ALL weeks:');
+    if (typed !== 'PURGE') return;
+    setMsg(toolsMsg, 'Purging all weeks…', '');
+    const { res, data } = await api('/.netlify/functions/admin-purge-all', 'POST', {});
+    if (!res.ok || !data.ok) return setMsg(toolsMsg, data.error || 'Failed', 'bad');
+    setMsg(toolsMsg, `Deleted ${data.deleted} week key(s)`, 'good');
+  });
+
+  deleteClipBtn.addEventListener('click', async () => {
+    const id = clipId.value.trim();
+    if (!id) return setMsg(toolsMsg, 'clipId is required', 'bad');
+    setMsg(toolsMsg, 'Deleting clip…', '');
+    const payload = { clipId: id };
+    if (week.value.trim()) payload.week = week.value.trim();
+    const { res, data } = await api('/.netlify/functions/admin-delete-clip', 'POST', payload);
+    if (!res.ok || !data.ok) return setMsg(toolsMsg, data.error || 'Failed', 'bad');
+    setMsg(toolsMsg, `Removed: ${data.removed} (week ${data.week})`, 'good');
+  });
+
+  showTools();
+</script>
+</body>
+</html>
