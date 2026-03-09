@@ -33,6 +33,10 @@
       background:#22c55e; color:#08110a;
     }
     .btn:hover{background:#16a34a}
+    .btn:disabled{
+  opacity:.7;
+  cursor:not-allowed;
+}
     .muted{color:#9ca3af;font-size:13px;margin-top:14px}
     .rules{margin-top:16px;color:#9ca3af;font-size:13px;line-height:1.45}
     .pill{display:inline-block;padding:4px 10px;border-radius:999px;background:#0f1117;border:1px solid #2b3347;color:#cbd5e1;font-size:12px}
@@ -51,12 +55,17 @@
       <h1>Submit Your Clip</h1>
       <p class="sub">Submit once. Then share your clip when voting goes live.</p>
 
-      <div id="successBox" class="ok">
-        ✅ Submission received. You’re in for this week.
-        <div class="muted" style="margin-top:8px;">
-          <a href="/vote.html">Go to Voting</a> • <a href="/">Back to Home</a>
-        </div>
-      </div>
+     <div id="successBox" class="ok">
+  ✅ Submission received. You’re in for this week.
+
+  <div style="margin-top:8px;color:#86efac;font-size:14px;">
+    Your clip may take <strong>30–60 seconds</strong> to appear on the voting page.
+  </div>
+
+  <div class="muted" style="margin-top:10px;">
+    <a href="/vote.html">Go to Voting</a> • <a href="/">Back to Home</a>
+  </div>
+</div>
 
       <div id="errorBox" class="err">
         ❌ Submission failed. Please try again.
@@ -178,7 +187,7 @@
     }
 
     submitBtn.disabled = true;
-    submitBtn.textContent = "Submitting…";
+    submitBtn.textContent = "Submitting. . .";
 
     try {
       const formData = new FormData(form);
