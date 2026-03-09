@@ -6,70 +6,239 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <style>
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       margin: 0;
       font-family: Arial, Helvetica, sans-serif;
-      background-color: #0f1117;
+      background: linear-gradient(180deg, #0a0f1c 0%, #0f1117 100%);
       color: #ffffff;
       text-align: center;
     }
 
     .container {
-      max-width: 900px;
+      max-width: 980px;
       margin: 0 auto;
-      padding: 60px 20px 60px 20px;
+      padding: 40px 20px 60px 20px;
     }
 
     .logo-wrapper {
-      margin-bottom: 25px;
+      margin-bottom: 10px;
     }
 
     .site-logo {
-      height: 400px;
+      height: 440px;
       width: auto;
       display: block;
       margin: 0 auto;
     }
 
+    .hero-title {
+      font-size: 48px;
+      font-weight: 800;
+      line-height: 1.1;
+      margin: 0 0 16px;
+      color: #ffffff;
+    }
+
     .subtitle {
+      max-width: 760px;
+      margin: 0 auto 34px;
       font-size: 20px;
+      line-height: 1.6;
       color: #9ca3af;
-      margin-bottom: 34px;
+    }
+
+    .button-row {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 40px;
     }
 
     .cta-button {
       display: inline-block;
-      padding: 15px 30px;
+      min-width: 220px;
+      padding: 16px 30px;
       background-color: #22c55e;
-      color: #000;
-      font-weight: bold;
+      color: #031108;
+      font-weight: 800;
+      font-size: 17px;
       text-decoration: none;
-      border-radius: 8px;
-      margin: 10px;
-      transition: 0.2s;
+      border-radius: 12px;
+      transition: 0.2s ease;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
     }
 
     .cta-button:hover {
       background-color: #16a34a;
+      transform: translateY(-1px);
     }
 
     .secondary-button {
       background-color: #2563eb;
-      color: #fff;
+      color: #ffffff;
     }
 
     .secondary-button:hover {
       background-color: #1d4ed8;
     }
 
-    .section {
-      margin-top: 60px;
+    .feature-card {
+      max-width: 760px;
+      margin: 0 auto 36px;
+      padding: 28px 24px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
+    }
+
+    .card-label {
+      display: inline-block;
+      margin-bottom: 10px;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #93c5fd;
+      background: rgba(37, 99, 235, 0.12);
+      border: 1px solid rgba(37, 99, 235, 0.35);
+      border-radius: 999px;
+    }
+
+    .theme-title {
+      margin: 6px 0 10px;
+      font-size: 34px;
+      font-weight: 800;
+      color: #ffffff;
+    }
+
+    .theme-subtitle {
+      margin: 0;
+      font-size: 20px;
+      color: #d1d5db;
     }
 
     .countdown {
-      font-size: 24px;
-      margin-top: 20px;
+      font-size: 34px;
+      font-weight: 800;
+      margin-top: 18px;
       color: #22c55e;
+    }
+
+    .prize-box {
+      margin-top: 24px;
+      padding-top: 22px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .prize-label {
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #fbbf24;
+      margin-bottom: 8px;
+    }
+
+    .prize-title {
+      font-size: 30px;
+      font-weight: 800;
+      color: #ffffff;
+      margin-bottom: 6px;
+    }
+
+    .prize-note {
+      font-size: 15px;
+      color: #9ca3af;
+    }
+
+    .section {
+      margin-top: 40px;
+    }
+
+    .section h2 {
+      margin: 0 0 18px;
+      font-size: 36px;
+      font-weight: 800;
+    }
+
+    .section-subtext {
+      max-width: 760px;
+      margin: 0 auto 26px;
+      color: #9ca3af;
+      font-size: 18px;
+      line-height: 1.6;
+    }
+
+    .benefits {
+      max-width: 900px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+    }
+
+    .benefit-card {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 24px 18px;
+      text-align: center;
+    }
+
+    .benefit-card h3 {
+      margin: 0 0 10px;
+      font-size: 22px;
+      color: #ffffff;
+    }
+
+    .benefit-card p {
+      margin: 0;
+      color: #9ca3af;
+      line-height: 1.55;
+      font-size: 15px;
+    }
+
+    .how-it-works {
+      max-width: 760px;
+      margin: 34px auto 0;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+    }
+
+    .step {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      padding: 18px 14px;
+    }
+
+    .step-number {
+      width: 34px;
+      height: 34px;
+      margin: 0 auto 12px;
+      border-radius: 50%;
+      background: #22c55e;
+      color: #04110a;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .step p {
+      margin: 0;
+      color: #d1d5db;
+      font-size: 15px;
+      line-height: 1.45;
     }
 
     footer {
@@ -77,6 +246,74 @@
       padding: 20px;
       font-size: 14px;
       color: #6b7280;
+    }
+
+    @media (max-width: 900px) {
+      .site-logo {
+        height: 340px;
+      }
+
+      .hero-title {
+        font-size: 40px;
+      }
+
+      .theme-title {
+        font-size: 30px;
+      }
+
+      .benefits {
+        grid-template-columns: 1fr;
+      }
+
+      .how-it-works {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (max-width: 640px) {
+      .container {
+        padding: 28px 16px 50px 16px;
+      }
+
+      .site-logo {
+        height: 230px;
+      }
+
+      .hero-title {
+        font-size: 30px;
+      }
+
+      .subtitle {
+        font-size: 17px;
+      }
+
+      .cta-button {
+        min-width: 100%;
+      }
+
+      .theme-title {
+        font-size: 26px;
+      }
+
+      .theme-subtitle {
+        font-size: 18px;
+      }
+
+      .countdown {
+        font-size: 28px;
+      }
+
+      .prize-title {
+        font-size: 24px;
+      }
+
+      .section h2 {
+        font-size: 28px;
+      }
+
+      .how-it-works {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 </head>
@@ -91,30 +328,74 @@
       </a>
     </div>
 
+    <h1 class="hero-title">Submit your best clip. Get the votes. Win the week.</h1>
+
     <div class="subtitle">
-      Weekly FPS Clip Competition. Submit your best play. Community votes. Winner takes the prize.
+      Weekly FPS clip competition where players submit their top plays, share their entry, and battle for the most votes.
     </div>
 
-    <a href="/submit.html" class="cta-button">
-      Submit Your Clip
-    </a>
+    <div class="button-row">
+      <a href="/submit.html" class="cta-button">Submit Your Clip</a>
+      <a href="/vote.html" class="cta-button secondary-button">View This Week's Clips</a>
+    </div>
 
-    <a href="/vote.html" class="cta-button secondary-button">
-      View This Week's Clips
-    </a>
-
-    <div class="section">
-      <h2>This Week's Theme</h2>
-      <p>Best FPS Clutch Moment</p>
+    <div class="feature-card">
+      <div class="card-label">This Week's Theme</div>
+      <div class="theme-title">Best FPS Clutch Moment</div>
+      <p class="theme-subtitle">Show off your most insane comeback, 1vX, or last-second play.</p>
       <div class="countdown" id="countdown"></div>
+
+      <div class="prize-box">
+        <div class="prize-label">🏆 This Week's Prize</div>
+        <div class="prize-title">$50 Cash Prize</div>
+        <div class="prize-note">Winner also gets featured on GamerTagClips.</div>
+      </div>
     </div>
 
     <div class="section">
-      <h2>How It Works</h2>
-      <p>1. Submit your clip.</p>
-      <p>2. Share your entry.</p>
-      <p>3. Community votes.</p>
-      <p>4. Highest votes wins.</p>
+      <h2>Why Submit?</h2>
+      <div class="section-subtext">
+        Turn your best clip into a weekly competition entry, rally your friends, and compete for votes, exposure, and the prize.
+      </div>
+
+      <div class="benefits">
+        <div class="benefit-card">
+          <h3>Show Your Skill</h3>
+          <p>Put your best play in front of the community and prove you’ve got the clips to back it up.</p>
+        </div>
+
+        <div class="benefit-card">
+          <h3>Share & Compete</h3>
+          <p>Send your entry to friends, followers, and teammates to build momentum and stack votes.</p>
+        </div>
+
+        <div class="benefit-card">
+          <h3>Win the Prize</h3>
+          <p>Top clip takes the weekly prize and earns featured winner status on GamerTagClips.</p>
+        </div>
+      </div>
+
+      <div class="how-it-works">
+        <div class="step">
+          <div class="step-number">1</div>
+          <p>Submit your best clip.</p>
+        </div>
+
+        <div class="step">
+          <div class="step-number">2</div>
+          <p>Share your entry.</p>
+        </div>
+
+        <div class="step">
+          <div class="step-number">3</div>
+          <p>Community votes.</p>
+        </div>
+
+        <div class="step">
+          <div class="step-number">4</div>
+          <p>Highest votes wins.</p>
+        </div>
+      </div>
     </div>
 
   </div>
