@@ -18,6 +18,7 @@
 --btn:#2563eb;
 --btn2:#0b1220;
 --danger:#b91c1c;
+--danger2:#7f1d1d;
 }
 
 *{box-sizing:border-box}
@@ -32,72 +33,64 @@ color:var(--text)
 .wrap{
 max-width:1100px;
 margin:auto;
-padding:30px 20px
+padding:26px 16px 60px
 }
 
-h1{margin:0 0 10px}
-h2{margin:0 0 10px}
-h3{margin:0 0 6px}
+h1{margin:0 0 8px;font-size:26px}
+h2{margin:0 0 12px;font-size:18px}
 
 .card{
 background:var(--card);
 border:1px solid var(--border);
 border-radius:14px;
-padding:18px;
-margin-bottom:16px
-}
-
-label{
-display:block;
-font-size:13px;
-color:var(--muted);
-margin-top:10px
-}
-
-input{
-width:100%;
-padding:10px;
-border-radius:10px;
-border:1px solid var(--border);
-background:#0b1220;
-color:#fff
+padding:16px;
+margin:12px 0
 }
 
 button{
-border:0;
-border-radius:10px;
-padding:10px 14px;
-font-weight:700;
-cursor:pointer;
 background:var(--btn);
-color:#fff
+color:#fff;
+border:0;
+border-radius:12px;
+padding:10px 12px;
+font-weight:800;
+cursor:pointer
 }
 
 button.secondary{background:#334155}
+button.danger{background:var(--danger)}
 button.warn{background:#a16207}
-button.danger{background:#b91c1c}
 
 .row{
 display:flex;
 gap:10px;
-flex-wrap:wrap
+flex-wrap:wrap;
+align-items:center
+}
+
+.grid{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:12px
 }
 
 .keys{
 white-space:pre-wrap;
 font-family:monospace;
+color:var(--muted);
 font-size:12px;
-color:#9ca3af;
 margin-top:10px
 }
 
 .clip{
-padding:10px;
-border-bottom:1px solid var(--border)
+border-bottom:1px solid var(--border);
+padding:10px 0
 }
 
-.clip strong{
-display:block
+.live{
+font-size:30px;
+font-weight:bold;
+margin-top:6px
 }
 
 </style>
@@ -107,38 +100,84 @@ display:block
 
 <div class="wrap">
 
+<div class="row" style="justify-content:space-between;margin-bottom:10px;">
 <h1>Admin Dashboard</h1>
+<button class="secondary" onclick="window.open('/','_blank')">
+Open Site
+</button>
+</div>
 
 <div class="card" id="loginCard">
+
 <h2>Login</h2>
+
 <input id="pw" type="password" placeholder="Admin password">
+
 <div class="row" style="margin-top:10px">
 <button id="loginBtn">Login</button>
 <span id="loginMsg"></span>
 </div>
+
 </div>
 
 <div id="toolsWrap" style="display:none">
 
+<div class="grid">
+
 <div class="card">
+
 <h2>Session</h2>
+
 <button id="logoutBtn" class="secondary">Logout</button>
+
 <div id="toolsMsg"></div>
+
 </div>
 
 <div class="card">
+
+<h2>Live Visitors</h2>
+
+<div id="liveUsers" class="live">—</div>
+
+<div style="color:#9ca3af;font-size:13px">
+Active visitors right now
+</div>
+
+<button id="refreshTrafficBtn" class="secondary" style="margin-top:10px">
+Refresh
+</button>
+
+</div>
+
+</div>
+
+<div class="card">
+
 <h2>Weeks</h2>
+
 <div class="row">
-<button id="listWeeksBtn" class="secondary">List weeks</button>
-<button id="resetWeekBtn" class="warn">Reset current week</button>
+
+<button id="listWeeksBtn" class="secondary">
+List weeks
+</button>
+
+<button id="resetWeekBtn" class="warn">
+Reset current week
+</button>
+
 </div>
+
 </div>
 
 <div class="card">
+
 <h2>Current Week Clips</h2>
 
 <div class="row">
-<button id="loadClipsBtn" class="secondary">Refresh clips</button>
+<button id="loadClipsBtn" class="secondary">
+Refresh clips
+</button>
 </div>
 
 <div id="clipsList"></div>
@@ -146,6 +185,7 @@ display:block
 </div>
 
 <div class="card">
+
 <h2>Delete Clip</h2>
 
 <label>Clip ID</label>
@@ -155,26 +195,32 @@ display:block
 <input id="week">
 
 <div class="row" style="margin-top:10px">
-<button id="deleteClipBtn" class="secondary">Delete Clip</button>
+<button id="deleteClipBtn" class="secondary">
+Delete clip
+</button>
 </div>
 
 </div>
 
 <div class="card">
+
 <h2>Output</h2>
+
 <div id="weeksOut" class="keys"></div>
+
 </div>
 
 <div class="card">
+
 <h2>Danger Zone</h2>
 
 <div style="margin-bottom:14px">
 
 <h3>Factory Reset</h3>
 
-<div class="row">
-<button id="factoryResetBtn" class="danger">Factory Reset Test Data</button>
-</div>
+<button id="factoryResetBtn" class="danger">
+Factory Reset Test Data
+</button>
 
 </div>
 
@@ -182,9 +228,9 @@ display:block
 
 <h3>Purge All Weeks</h3>
 
-<div class="row">
-<button id="purgeAllBtn" class="danger">Purge ALL weeks</button>
-</div>
+<button id="purgeAllBtn" class="danger">
+Purge ALL weeks
+</button>
 
 </div>
 
@@ -222,23 +268,32 @@ const weeksOut = document.getElementById("weeksOut");
 const loadClipsBtn = document.getElementById("loadClipsBtn");
 const clipsList = document.getElementById("clipsList");
 
+const liveUsers = document.getElementById("liveUsers");
+const refreshTrafficBtn = document.getElementById("refreshTrafficBtn");
+
 function showTools(){
+
 loginCard.style.display = token ? "none":"";
 toolsWrap.style.display = token ? "":"none";
+
 }
 
 async function api(path,method="GET",body=null){
 
 const opts={method,headers:{}};
 
-if(token) opts.headers["authorization"]="Bearer "+token;
+if(token)
+opts.headers["authorization"]="Bearer "+token;
 
 if(body){
+
 opts.headers["content-type"]="application/json";
 opts.body=JSON.stringify(body);
+
 }
 
 const res=await fetch(path,opts);
+
 const data=await res.json();
 
 return {res,data};
@@ -250,15 +305,21 @@ async function login(){
 const password=pw.value.trim();
 
 if(!password){
+
 loginMsg.textContent="Enter password";
+
 return;
+
 }
 
 const {res,data}=await api("/.netlify/functions/admin-login","POST",{password});
 
 if(!res.ok){
+
 loginMsg.textContent="Login failed";
+
 return;
+
 }
 
 token=data.token;
@@ -272,9 +333,12 @@ showTools();
 loginBtn.onclick=login;
 
 logoutBtn.onclick=()=>{
+
 token="";
 localStorage.removeItem("gtc_admin_token");
+
 showTools();
+
 };
 
 listWeeksBtn.onclick=async ()=>{
@@ -320,13 +384,17 @@ deleteClipBtn.onclick=async ()=>{
 const id=clipId.value.trim();
 
 if(!id){
+
 toolsMsg.textContent="clipId required";
+
 return;
+
 }
 
 const payload={clipId:id};
 
-if(week.value.trim()) payload.week=week.value.trim();
+if(week.value.trim())
+payload.week=week.value.trim();
 
 await api("/.netlify/functions/admin-delete-clip","POST",payload);
 
@@ -343,20 +411,52 @@ const {data}=await api("/.netlify/functions/clips-get");
 const clips=data.clips||[];
 
 if(!clips.length){
+
 clipsList.innerHTML="No clips yet.";
+
 return;
+
 }
 
 clipsList.innerHTML=clips.map(c=>`
+
 <div class="clip">
+
 <strong>${c.title}</strong>
+
 ${c.gamerTag} • ${c.game}<br>
+
 Votes: ${c.votes}<br>
+
 ID: ${c.id}
+
 </div>
+
 `).join("");
 
 };
+
+async function loadTraffic(){
+
+try{
+
+const res = await fetch("https://api.countapi.xyz/hit/gamertagclips/live");
+
+const data = await res.json();
+
+liveUsers.textContent = data.value;
+
+}catch{
+
+liveUsers.textContent="—";
+
+}
+
+}
+
+refreshTrafficBtn.onclick=loadTraffic;
+
+loadTraffic();
 
 showTools();
 
