@@ -6,8 +6,8 @@ function json(status, obj) {
     status,
     headers: {
       "content-type": "application/json",
-      "cache-control": "no-store",
-    },
+      "cache-control": "no-store"
+    }
   });
 }
 
@@ -27,7 +27,16 @@ function getIp(req) {
   );
 }
 
+function getToken(req) {
+  return req.headers.get("x-gtc-voter") || null;
+}
+
+function generateToken() {
+  return crypto.randomUUID();
+}
+
 export default async (req) => {
+
   if (req.method !== "POST") {
     return json(405, { ok: false, error: "Method not allowed" });
   }
@@ -62,68 +71,49 @@ export default async (req) => {
   const doc = await readClipsDoc(store, key);
   const clips = doc.clips || [];
 
-  const idx = clips.findIndex((c) => String(c.id) === clipId);
+  const idx = clips.findIndex(c => String(c.id) === clipId);
   if (idx === -1) {
     return json(404, { ok: false, error: "Clip not found" });
   }
 
   const ip = getIp(req);
+  const token = getToken(req);
 
-  // One vote TOTAL per IP per week
-  const weeklyVoteKey = `vote:${w.week}:${ip}`;
-  const existingVote = await store.get(weeklyVoteKey, { type: "json" }).catch(() => null);
+  const ipKey = `vote-ip:${w.week}:${ip}`;
+  const tokenKey = token ? `vote-token:${w.week}:${token}` : null;
 
-  if (existingVote?.voted) {
-    return json(429, {
-      ok: false,
-      error: "You already voted this week",
-      votedClipId: existingVote.clipId || null,
-      votedAt: existingVote.at || null,
-    });
+  const existingIpVote = await store.get(ipKey, { type: "json" }).catch(() => null);
+  if (existingIpVote?.voted) {
+    return json(429, { ok: false, error: "You already voted this week" });
   }
 
-  // Optional lightweight attempt-rate limiter to slow abuse
-  const attemptKey = `vote-attempt:${w.week}:${ip}`;
-  const now = Date.now();
-  const existingAttempt = await store.get(attemptKey, { type: "json" }).catch(() => null);
-
-  if (existingAttempt?.at && now - Number(existingAttempt.at) < 3000) {
-    return json(429, { ok: false, error: "Please wait a moment before trying again" });
+  if (tokenKey) {
+    const existingTokenVote = await store.get(tokenKey, { type: "json" }).catch(() => null);
+    if (existingTokenVote?.voted) {
+      return json(429, { ok: false, error: "You already voted this week" });
+    }
   }
-
-  await store.setJSON(
-    attemptKey,
-    { at: now },
-    { metadata: { updatedAt: new Date(now).toISOString() } }
-  );
 
   const voteTime = new Date().toISOString();
 
-  // Record weekly voter lock BEFORE incrementing further requests
-  await store.setJSON(
-    weeklyVoteKey,
-    {
-      voted: true,
-      clipId,
-      at: voteTime,
-      ip,
-    },
-    { metadata: { updatedAt: voteTime } }
-  );
+  await store.setJSON(ipKey, { voted: true, at: voteTime });
+
+  const newToken = token || generateToken();
+
+  await store.setJSON(`vote-token:${w.week}:${newToken}`, {
+    voted: true,
+    at: voteTime
+  });
 
   clips[idx].votes = Number(clips[idx].votes || 0) + 1;
   clips[idx].lastVoteAt = voteTime;
 
-  await store.setJSON(
-    key,
-    { clips },
-    { metadata: { updatedAt: voteTime } }
-  );
+  await store.setJSON(key, { clips });
 
   return json(200, {
     ok: true,
     votes: clips[idx].votes,
-    clipId,
-    week: w.week,
+    token: newToken
   });
+
 };
