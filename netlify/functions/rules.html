@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Rules | GamerTagClips</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{
+      --bg:#0f1117;
+      --card:#151a24;
+      --border:#232a3a;
+      --text:#ffffff;
+      --muted:#b6c0d0;
+      --blue:#2563eb;
+      --green:#22c55e;
+      --gold:#fbbf24;
+    }
+
+    *{box-sizing:border-box}
+
+    body{
+      margin:0;
+      font-family:Arial,Helvetica,sans-serif;
+      background:var(--bg);
+      color:var(--text);
+    }
+
+    header{
+      border-bottom:1px solid var(--border);
+      background:#0c1018;
+    }
+
+    .topbar{
+      max-width:1000px;
+      margin:0 auto;
+      padding:16px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      flex-wrap:wrap;
+    }
+
+    .brand{
+      font-weight:900;
+      font-size:20px;
+      letter-spacing:.2px;
+    }
+
+    .brand a{
+      color:var(--text);
+      text-decoration:none;
+    }
+
+    nav{
+      display:flex;
+      gap:14px;
+      flex-wrap:wrap;
+    }
+
+    nav a{
+      color:#93c5fd;
+      text-decoration:none;
+      font-weight:700;
+    }
+
+    nav a:hover{
+      text-decoration:underline;
+    }
+
+    .wrap{
+      max-width:1000px;
+      margin:0 auto;
+      padding:32px 16px 60px;
+    }
+
+    .hero{
+      margin-bottom:24px;
+    }
+
+    .hero h1{
+      margin:0 0 10px;
+      font-size:38px;
+      line-height:1.1;
+    }
+
+    .hero p{
+      margin:0;
+      max-width:760px;
+      color:var(--muted);
+      font-size:18px;
+      line-height:1.6;
+    }
+
+    .card{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:16px;
+      padding:22px;
+      margin:14px 0;
+    }
+
+    .card h2{
+      margin:0 0 12px;
+      font-size:22px;
+      color:var(--text);
+    }
+
+    .card p{
+      margin:0 0 12px;
+      color:var(--muted);
+      line-height:1.65;
+      font-size:15px;
+    }
+
+    .card p:last-child{
+      margin-bottom:0;
+    }
+
+    .highlight{
+      color:var(--gold);
+      font-weight:800;
+    }
+
+    .footer-note{
+      margin-top:24px;
+      color:var(--muted);
+      font-size:14px;
+      line-height:1.6;
+    }
+
+    .cta-row{
+      margin-top:28px;
+      display:flex;
+      gap:12px;
+      flex-wrap:wrap;
+    }
+
+    .btn{
+      display:inline-block;
+      padding:14px 22px;
+      border-radius:12px;
+      text-decoration:none;
+      font-weight:800;
+      transition:.2s ease;
+    }
+
+    .btn-primary{
+      background:var(--green);
+      color:#08110a;
+    }
+
+    .btn-primary:hover{
+      background:#16a34a;
+    }
+
+    .btn-secondary{
+      background:var(--blue);
+      color:#fff;
+    }
+
+    .btn-secondary:hover{
+      background:#1d4ed8;
+    }
+
+    footer{
+      margin-top:42px;
+      padding-top:18px;
+      border-top:1px solid var(--border);
+      color:#7f8ba0;
+      font-size:13px;
+    }
+
+    @media (max-width: 640px){
+      .hero h1{
+        font-size:30px;
+      }
+
+      .hero p{
+        font-size:16px;
+      }
+
+      .card{
+        padding:18px;
+      }
+
+      .card h2{
+        font-size:20px;
+      }
+
+      .btn{
+        width:100%;
+        text-align:center;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="topbar">
+      <div class="brand"><a href="/">GamerTagClips</a></div>
+      <nav>
+        <a href="/">Home</a>
+        <a href="/submit.html">Submit</a>
+        <a href="/vote.html">Vote</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <h1>Contest Rules</h1>
+      <p>
+        These rules help keep GamerTagClips fair, competitive, and fun. By submitting a clip or voting,
+        you agree to follow the rules below.
+      </p>
+    </section>
+
+    <section class="card">
+      <h2>1. Eligibility</h2>
+      <p>
+        GamerTagClips competitions are intended for users who can legally participate in online contests
+        and receive prizes in their local area. By entering, you confirm that you are responsible for
+        complying with any local laws or restrictions that apply to you.
+      </p>
+    </section>
+
+    <section class="card">
+      <h2>2. Submission Rules</h2>
+      <p>
+        You may only submit clips that you created, own, or have clear permission to share. Submitted clips
+        must be public and viewable through the supported clip link on the site.
+      </p>
+      <p>
+        Do not submit stolen clips, impersonated content, misleading entries, duplicate spam submissions,
+        or anything unlawful, abusive, hateful, pornographic, or otherwise inappropriate for the platform.
+      </p>
+      <p>
+        GamerTagClips reserves the right to remove or reject any submission at any time for any rule violation,
+        quality concern, or suspicious activity.
+      </p>
+    </section>
+
+    <section class="card">
+      <h2>3. Voting Rules</h2>
+      <p>
+        Voting is limited to <span class="highlight">one vote per person per week</span>. Any attempt to bypass
+        this limit through bots, scripts, fake accounts, incognito abuse, VPN abuse, automation, coordinated
+        manipulation, or any other dishonest method is prohibited.
+      </p>
+      <p>
+        GamerTagClips may investigate suspicious voting patterns and may remove votes, remove entries,
+        disqualify participants, or suspend voting activity whenever necessary to protect the integrity
+        of the competition.
+      </p>
+    </section>
+
+    <section class="card">
+      <h2>4. Winner Selection</h2>
+      <p>
+        The weekly winner is the eligible clip with the highest number of valid votes at the close of the
+        competition window.
+      </p>
+      <p>
+        In the event of a tie, the clip that was <span class="highlight">submitted first</span> ranks higher.
+      </p>
+      <p>
+        GamerTagClips may request reasonable verification before confirming a winner, including identity,
+        ownership of the clip, or method of prize delivery.
+      </p>
+    </section>
+
+    <section class="card">
+      <h2>5. Prize Terms</h2>
+      <p>
+        Any listed prize is subject to availability, verification, and final approval. GamerTagClips reserves
+        the right to substitute, modify, delay, or cancel a prize if needed for fraud prevention, eligibility
+        issues, platform abuse, technical issues, or other operational reasons.
+      </p>
+      <p>
+        If a selected winner does not respond in a reasonable timeframe, cannot be verified, or is found to
+        have violated the rules, GamerTagClips may select another winner or choose not to award the prize.
+      </p>
+    </section>
+
+    <section class="card">
+      <h2>6. Content Rights</h2>
+      <p>
+        You keep ownership of your original clip. By submitting it to GamerTagClips, you give GamerTagClips
+        permission to display, promote, share, and feature your clip, gamertag, and entry details on the site
+        and in related promotional content for the platform.
+      </p>
+    </section>
+
+    <section class="card">
+      <h2>7. Platform Discretion</h2>
+      <p>
+        GamerTagClips reserves full discretion to review entries, review votes, remove suspicious activity,
+        disqualify users, correct mistakes, pause a competition, modify contest structure, or cancel a contest
+        if fairness, technical stability, or platform integrity is at risk.
+      </p>
+      <p>
+        All platform decisions regarding rules, abuse prevention, vote validity, eligibility, and winner
+        selection are final.
+      </p>
+    </section>
+
+    <section class="card">
+      <h2>8. Platform Disclaimer</h2>
+      <p>
+        GamerTagClips is an independent platform and is not affiliated with, endorsed by, or sponsored by any
+        game publisher, console manufacturer, streaming platform, or social media platform unless explicitly stated.
+      </p>
+    </section>
+
+    <section class="card">
+      <h2>9. Acceptance of Rules</h2>
+      <p>
+        By submitting a clip, voting, or participating in any GamerTagClips competition, you acknowledge that
+        you have read, understood, and agreed to these rules.
+      </p>
+    </section>
+
+    <div class="cta-row">
+      <a href="/submit.html" class="btn btn-primary">Submit a Clip</a>
+      <a href="/vote.html" class="btn btn-secondary">Go to Voting</a>
+    </div>
+
+    <div class="footer-note">
+      These rules may be updated from time to time as GamerTagClips grows and improves.
+    </div>
+
+    <footer>
+      © 2026 GamerTagClips.com
+    </footer>
+  </main>
+</body>
+</html>
