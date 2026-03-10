@@ -14,6 +14,7 @@
 --blue:#2d6cff;
 --green:#61ffb0;
 --red:#ff7a7a;
+--gold:#ffd56a;
 }
 
 *{box-sizing:border-box}
@@ -31,6 +32,7 @@ border-bottom:1px solid rgba(255,255,255,.08);
 display:flex;
 justify-content:space-between;
 flex-wrap:wrap;
+gap:10px;
 }
 
 nav a{
@@ -116,6 +118,62 @@ margin-top:20px;
 opacity:.7;
 font-size:13px;
 }
+
+.top3Wrap{
+margin-bottom:16px;
+}
+
+.top3Title{
+font-size:16px;
+font-weight:900;
+margin:0 0 10px;
+}
+
+.top3Grid{
+display:grid;
+grid-template-columns:repeat(3,1fr);
+gap:10px;
+}
+
+.top3Card{
+display:block;
+text-decoration:none;
+color:var(--text);
+background:var(--panel);
+border:1px solid var(--border);
+border-radius:12px;
+padding:12px;
+}
+
+.top3Card.active{
+border-color:rgba(255,213,106,.45);
+box-shadow:0 0 0 1px rgba(255,213,106,.12) inset;
+}
+
+.top3Rank{
+font-size:12px;
+font-weight:900;
+color:var(--gold);
+margin-bottom:6px;
+}
+
+.top3Name{
+font-size:13px;
+font-weight:800;
+line-height:1.2;
+margin-bottom:4px;
+}
+
+.top3Votes{
+font-size:12px;
+opacity:.85;
+}
+
+@media (max-width:700px){
+  .top3Grid{
+    grid-template-columns:1fr;
+  }
+}
 </style>
 </head>
 
@@ -131,6 +189,11 @@ font-size:13px;
 </header>
 
 <div class="wrap">
+
+<div class="top3Wrap">
+  <div class="top3Title">🏆 Top 3 Right Now</div>
+  <div id="top3Strip" class="top3Grid"></div>
+</div>
 
 <div id="clipContainer"></div>
 
@@ -148,6 +211,7 @@ let WEEKLY_VOTE = JSON.parse(localStorage.getItem(WEEK_VOTE_KEY) || "{}");
 
 let CURRENT_WEEK = "";
 let CLIP = null;
+let ALL_CLIPS = [];
 let AUTO_REFRESH_TIMER = null;
 
 function getClipId(){
@@ -184,6 +248,37 @@ function esc(s){
 
 function userVoted(){
   return WEEKLY_VOTE.week === CURRENT_WEEK;
+}
+
+function sortTop3(clips){
+  return [...clips].sort((a, b) => {
+    const voteDiff = Number(b.votes || 0) - Number(a.votes || 0);
+    if (voteDiff !== 0) return voteDiff;
+
+    const aTime = new Date(a.submittedAt || 0).getTime() || 0;
+    const bTime = new Date(b.submittedAt || 0).getTime() || 0;
+    return aTime - bTime;
+  }).slice(0, 3);
+}
+
+function renderTop3Strip(){
+  const el = document.getElementById("top3Strip");
+  if (!el) return;
+
+  const top3 = sortTop3(ALL_CLIPS);
+
+  if (!top3.length) {
+    el.innerHTML = `<div class="msg">No clips yet.</div>`;
+    return;
+  }
+
+  el.innerHTML = top3.map((c, i) => `
+    <a class="top3Card ${String(c.id) === String(CLIP?.id) ? "active" : ""}" href="/clip.html?id=${encodeURIComponent(c.id)}">
+      <div class="top3Rank">#${i + 1}</div>
+      <div class="top3Name">${esc(c.title || "Untitled Clip")}</div>
+      <div class="top3Votes">${Number(c.votes || 0)} vote(s)</div>
+    </a>
+  `).join("");
 }
 
 function renderClip(){
@@ -267,7 +362,7 @@ async function fetchClipData(){
   const clips = Array.isArray(data.clips) ? data.clips : [];
   const clip = clips.find(c => String(c.id) === String(id)) || null;
 
-  return { week, clip };
+  return { week, clips, clip };
 }
 
 async function vote(){
@@ -326,11 +421,15 @@ async function loadClip(){
 
   if (result.missingId) {
     document.getElementById("clipContainer").innerHTML = "Clip not found.";
+    document.getElementById("top3Strip").innerHTML = "";
     return;
   }
 
   CURRENT_WEEK = result.week || "";
+  ALL_CLIPS = result.clips || [];
   CLIP = result.clip;
+
+  renderTop3Strip();
 
   if(!CLIP){
     document.getElementById("clipContainer").innerHTML = "Clip not found.";
@@ -345,9 +444,14 @@ async function refreshLiveClip(){
     const result = await fetchClipData();
 
     if (result.missingId) return;
-    if (!result.clip) return;
 
     CURRENT_WEEK = result.week || "";
+    ALL_CLIPS = result.clips || [];
+
+    renderTop3Strip();
+
+    if (!result.clip) return;
+
     CLIP = result.clip;
 
     const voteCountEl = document.getElementById("voteCount");
@@ -357,7 +461,7 @@ async function refreshLiveClip(){
 
     updateVoteUi();
   }catch(e){
-    // silent retry on next interval
+    // silent retry next cycle
   }
 }
 
