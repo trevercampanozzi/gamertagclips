@@ -82,81 +82,183 @@
 
   let token = localStorage.getItem('gtc_admin_token') || '';
 
-  function setMsg(el, text, kind){
+  function setMsg(el, text, kind) {
     el.textContent = text || '';
     el.className = 'msg ' + (kind === 'good' ? 'good' : (kind === 'bad' ? 'bad' : ''));
   }
 
-  function showTools(){
+  function clearSession(message = '') {
+    token = '';
+    localStorage.removeItem('gtc_admin_token');
+    loginCard.style.display = '';
+    toolsCard.style.display = 'none';
+    if (message) setMsg(loginMsg, message, 'bad');
+    setMsg(toolsMsg, '', '');
+    weeksOut.textContent = '';
+    pw.value = '';
+    pw.focus();
+  }
+
+  function showTools() {
     loginCard.style.display = token ? 'none' : '';
     toolsCard.style.display = token ? '' : 'none';
   }
 
-  async function api(path, method='GET', body=null){
-    const opts = { method, headers: { 'cache-control':'no-store' } };
-    if (token) opts.headers['authorization'] = 'Bearer ' + token;
+  async function api(path, method = 'GET', body = null) {
+    const opts = {
+      method,
+      headers: { 'cache-control': 'no-store' }
+    };
+
+    if (token) {
+      opts.headers['authorization'] = 'Bearer ' + token;
+    }
+
     if (body) {
       opts.headers['content-type'] = 'application/json';
       opts.body = JSON.stringify(body);
     }
+
     const res = await fetch(path, opts);
     const data = await res.json().catch(() => ({}));
-    return { res, data };
+
+    if (
+      res.status === 401 ||
+      String(data.error || '').toLowerCase().includes('session expired') ||
+      String(data.error || '').toLowerCase().includes('unauthorized')
+    ) {
+      clearSession('Session expired. Please log in again.');
+      return { res, data, authFailed: true };
+    }
+
+    return { res, data, authFailed: false };
   }
 
-  async function login(){
-    setMsg(loginMsg, 'Logging in…', '');
-    const { res, data } = await api('/.netlify/functions/admin-login', 'POST', { password: pw.value });
-    if (!res.ok || !data.ok) {
-      setMsg(loginMsg, data.error || 'Login failed', 'bad');
+  async function login() {
+    const password = pw.value.trim();
+    if (!password) {
+      setMsg(loginMsg, 'Enter your admin password', 'bad');
       return;
     }
-    token = data.token;
-    localStorage.setItem('gtc_admin_token', token);
-    setMsg(loginMsg, 'Logged in ✅', 'good');
-    showTools();
+
+    loginBtn.disabled = true;
+    setMsg(loginMsg, 'Logging in…', '');
+
+    try {
+      const { res, data } = await api('/.netlify/functions/admin-login', 'POST', { password });
+
+      if (!res.ok || !data.ok) {
+        setMsg(loginMsg, data.error || 'Login failed', 'bad');
+        return;
+      }
+
+      token = data.token || '';
+      localStorage.setItem('gtc_admin_token', token);
+
+      setMsg(loginMsg, 'Logged in ✅', 'good');
+      setMsg(toolsMsg, '', '');
+      weeksOut.textContent = '';
+      showTools();
+    } catch (e) {
+      setMsg(loginMsg, 'Login failed', 'bad');
+    } finally {
+      loginBtn.disabled = false;
+    }
+  }
+
+  function addLogoutButton() {
+    if (document.getElementById('logoutBtn')) return;
+
+    const btn = document.createElement('button');
+    btn.id = 'logoutBtn';
+    btn.textContent = 'Logout';
+    btn.className = 'secondary';
+    btn.style.marginLeft = '10px';
+    btn.addEventListener('click', () => {
+      clearSession('Logged out.');
+    });
+
+    const toolsHeader = toolsCard.querySelector('h2');
+    if (toolsHeader) {
+      toolsHeader.insertAdjacentElement('afterend', btn);
+    }
+  }
+
+  async function validateSessionOnLoad() {
+    if (!token) {
+      showTools();
+      return;
+    }
+
+    const { authFailed } = await api('/.netlify/functions/admin-list-weeks', 'GET');
+
+    if (!authFailed) {
+      showTools();
+      addLogoutButton();
+      setMsg(toolsMsg, 'Session active ✅', 'good');
+    }
   }
 
   loginBtn.addEventListener('click', login);
-  pw.addEventListener('keydown', (e) => { if (e.key === 'Enter') login(); });
+  pw.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') login();
+  });
 
   listWeeksBtn.addEventListener('click', async () => {
     setMsg(toolsMsg, 'Loading weeks…', '');
-    const { res, data } = await api('/.netlify/functions/admin-list-weeks', 'GET');
+    weeksOut.textContent = '';
+
+    const { res, data, authFailed } = await api('/.netlify/functions/admin-list-weeks', 'GET');
+    if (authFailed) return;
     if (!res.ok || !data.ok) return setMsg(toolsMsg, data.error || 'Failed', 'bad');
-    setMsg(toolsMsg, `Found ${data.count} week keys`, 'good');
+
+    setMsg(toolsMsg, `Found ${data.count} week key(s)`, 'good');
     weeksOut.textContent = (data.keys || []).join('\n');
   });
 
   resetWeekBtn.addEventListener('click', async () => {
     if (!confirm('Reset current week? This deletes ALL clips for the current week.')) return;
+
     setMsg(toolsMsg, 'Resetting current week…', '');
-    const { res, data } = await api('/.netlify/functions/admin-reset-week', 'POST', {});
+    const { res, data, authFailed } = await api('/.netlify/functions/admin-reset-week', 'POST', {});
+    if (authFailed) return;
     if (!res.ok || !data.ok) return setMsg(toolsMsg, data.error || 'Failed', 'bad');
+
     setMsg(toolsMsg, `Deleted: ${data.deletedKey}`, 'good');
   });
 
   purgeAllBtn.addEventListener('click', async () => {
     const typed = prompt('Type PURGE to delete ALL weeks:');
     if (typed !== 'PURGE') return;
+
     setMsg(toolsMsg, 'Purging all weeks…', '');
-    const { res, data } = await api('/.netlify/functions/admin-purge-all', 'POST', {});
+    const { res, data, authFailed } = await api('/.netlify/functions/admin-purge-all', 'POST', {});
+    if (authFailed) return;
     if (!res.ok || !data.ok) return setMsg(toolsMsg, data.error || 'Failed', 'bad');
+
     setMsg(toolsMsg, `Deleted ${data.deleted} week key(s)`, 'good');
+    weeksOut.textContent = '';
   });
 
   deleteClipBtn.addEventListener('click', async () => {
     const id = clipId.value.trim();
     if (!id) return setMsg(toolsMsg, 'clipId is required', 'bad');
+
     setMsg(toolsMsg, 'Deleting clip…', '');
     const payload = { clipId: id };
     if (week.value.trim()) payload.week = week.value.trim();
-    const { res, data } = await api('/.netlify/functions/admin-delete-clip', 'POST', payload);
+
+    const { res, data, authFailed } = await api('/.netlify/functions/admin-delete-clip', 'POST', payload);
+    if (authFailed) return;
     if (!res.ok || !data.ok) return setMsg(toolsMsg, data.error || 'Failed', 'bad');
+
     setMsg(toolsMsg, `Removed: ${data.removed} (week ${data.week})`, 'good');
+    clipId.value = '';
   });
 
   showTools();
+  addLogoutButton();
+  validateSessionOnLoad();
 </script>
 </body>
 </html>
