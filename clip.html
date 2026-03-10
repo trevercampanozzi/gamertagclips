@@ -6,7 +6,6 @@
 <title>Clip — GamerTagClips</title>
 
 <style>
-
 :root{
 --bg:#0b0f19;
 --panel:rgba(255,255,255,.04);
@@ -58,6 +57,7 @@ width:100%;
 aspect-ratio:16/9;
 background:#111;
 object-fit:cover;
+display:block;
 }
 
 .pad{
@@ -98,6 +98,11 @@ cursor:pointer;
 background:#334155;
 }
 
+button[disabled]{
+opacity:.5;
+cursor:not-allowed;
+}
+
 .msg{
 margin-top:10px;
 font-size:14px;
@@ -111,7 +116,6 @@ margin-top:20px;
 opacity:.7;
 font-size:13px;
 }
-
 </style>
 </head>
 
@@ -137,208 +141,252 @@ Share your clip page to get more votes.
 </div>
 
 <script>
+const TOKEN_KEY = "gtcVoterToken";
+const WEEK_VOTE_KEY = "gtcWeekVote";
 
-const TOKEN_KEY="gtcVoterToken";
-const WEEK_VOTE_KEY="gtcWeekVote";
+let WEEKLY_VOTE = JSON.parse(localStorage.getItem(WEEK_VOTE_KEY) || "{}");
 
-let WEEKLY_VOTE=JSON.parse(localStorage.getItem(WEEK_VOTE_KEY)||"{}");
-
-let CURRENT_WEEK="";
-let CLIP=null;
+let CURRENT_WEEK = "";
+let CLIP = null;
+let AUTO_REFRESH_TIMER = null;
 
 function getClipId(){
-
-const params=new URLSearchParams(window.location.search);
-return params.get("id");
-
+  const params = new URLSearchParams(window.location.search);
+  return params.get("id");
 }
 
 function ensureToken(){
+  let token = localStorage.getItem(TOKEN_KEY);
 
-let token=localStorage.getItem(TOKEN_KEY);
+  if(!token){
+    token = crypto.randomUUID();
+    localStorage.setItem(TOKEN_KEY, token);
+  }
 
-if(!token){
-token=crypto.randomUUID();
-localStorage.setItem(TOKEN_KEY,token);
-}
-
-return token;
-
+  return token;
 }
 
 function shareClip(){
-
-const url=window.location.href;
-
-navigator.clipboard.writeText(url);
-
-alert("Clip link copied! Share it to get votes.");
-
+  const url = window.location.href;
+  navigator.clipboard.writeText(url);
+  alert("Clip link copied! Share it to get votes.");
 }
 
 function esc(s){
-return String(s||"").replace(/[&<>"']/g,m=>({
-"&":"&amp;",
-"<":"&lt;",
-">":"&gt;",
-'"':"&quot;",
-"'":"&#39;"
-}[m]));
+  return String(s || "").replace(/[&<>"']/g, m => ({
+    "&":"&amp;",
+    "<":"&lt;",
+    ">":"&gt;",
+    '"':"&quot;",
+    "'":"&#39;"
+  }[m]));
+}
+
+function userVoted(){
+  return WEEKLY_VOTE.week === CURRENT_WEEK;
 }
 
 function renderClip(){
+  const c = CLIP;
+  const voted = userVoted();
+  const votedThis = voted && WEEKLY_VOTE.clipId === c.id;
 
-const c=CLIP;
+  const container = document.getElementById("clipContainer");
 
-const voted=WEEKLY_VOTE.week===CURRENT_WEEK;
-const votedThis=voted&&WEEKLY_VOTE.clipId===c.id;
+  container.innerHTML = `
+    <div class="card">
+      ${c.thumbUrl ? `<img class="thumb" src="${esc(c.thumbUrl)}" alt="${esc(c.title)}">` : `<div class="thumb"></div>`}
 
-const container=document.getElementById("clipContainer");
+      <div class="pad">
+        <div class="title">${esc(c.title)}</div>
 
-container.innerHTML=`
+        <div class="sub">
+          ${esc(c.gamerTag || "")} • ${esc(c.game || "")}
+        </div>
 
-<div class="card">
+        <div class="row">
+          <div>
+            <strong id="voteCount">${Number(c.votes || 0)}</strong> vote(s)
+          </div>
 
-${c.thumbUrl?`<img class="thumb" src="${esc(c.thumbUrl)}">`:`<div class="thumb"></div>`}
+          <div style="display:flex;gap:8px;">
+            <button id="voteBtn" ${voted ? "disabled" : ""}>
+              ${voted ? (votedThis ? "Voted" : "Vote Locked") : "Vote"}
+            </button>
 
-<div class="pad">
+            <button class="shareBtn" onclick="shareClip()">
+              Share
+            </button>
+          </div>
+        </div>
 
-<div class="title">${esc(c.title)}</div>
+        ${c.clipUrl ? `<div class="msg"><a href="${esc(c.clipUrl)}" target="_blank" rel="noopener">Watch Clip →</a></div>` : ""}
 
-<div class="sub">
-${esc(c.gamerTag||"")} • ${esc(c.game||"")}
-</div>
+        <div id="msg" class="msg"></div>
+      </div>
+    </div>
+  `;
 
-<div class="row">
-
-<div>
-<strong id="voteCount">${c.votes}</strong> vote(s)
-</div>
-
-<div style="display:flex;gap:8px;">
-
-<button id="voteBtn" ${voted?"disabled":""}>
-${voted?(votedThis?"Voted":"Vote Locked"):"Vote"}
-</button>
-
-<button class="shareBtn" onclick="shareClip()">
-Share
-</button>
-
-</div>
-
-</div>
-
-${c.clipUrl?`<div class="msg"><a href="${esc(c.clipUrl)}" target="_blank">Watch Clip →</a></div>`:""}
-
-<div id="msg" class="msg"></div>
-
-</div>
-
-</div>
-`;
-
-document.getElementById("voteBtn")?.addEventListener("click",vote);
-
+  document.getElementById("voteBtn")?.addEventListener("click", vote);
 }
 
-function setMsg(text,type){
+function setMsg(text, type){
+  const el = document.getElementById("msg");
+  if(!el) return;
+  el.className = "msg " + (type === "ok" ? "ok" : "bad");
+  el.textContent = text;
+}
 
-const el=document.getElementById("msg");
-el.className="msg "+(type==="ok"?"ok":"bad");
-el.textContent=text;
+function updateVoteUi(){
+  const voteCountEl = document.getElementById("voteCount");
+  if (voteCountEl && CLIP) {
+    voteCountEl.textContent = String(Number(CLIP.votes || 0));
+  }
 
+  const btn = document.getElementById("voteBtn");
+  if (!btn || !CLIP) return;
+
+  const voted = userVoted();
+  const votedThis = voted && WEEKLY_VOTE.clipId === CLIP.id;
+
+  btn.disabled = voted;
+  btn.textContent = voted ? (votedThis ? "Voted" : "Vote Locked") : "Vote";
+}
+
+async function fetchClipData(){
+  const id = getClipId();
+
+  if(!id){
+    return { missingId: true };
+  }
+
+  const res = await fetch("/.netlify/functions/clips-get?t=" + Date.now(), { cache: "no-store" });
+  const data = await res.json();
+
+  const week = data.week || "";
+  const clips = Array.isArray(data.clips) ? data.clips : [];
+  const clip = clips.find(c => String(c.id) === String(id)) || null;
+
+  return { week, clip };
 }
 
 async function vote(){
+  const btn = document.getElementById("voteBtn");
 
-const btn=document.getElementById("voteBtn");
+  if (userVoted()) {
+    updateVoteUi();
+    return;
+  }
 
-btn.disabled=true;
+  if (!btn || !CLIP) return;
 
-try{
+  btn.disabled = true;
 
-const token=ensureToken();
+  try{
+    const token = ensureToken();
 
-const res=await fetch("/.netlify/functions/vote-post",{
+    const res = await fetch("/.netlify/functions/vote-post", {
+      method:"POST",
+      headers:{
+        "content-type":"application/json",
+        "x-gtc-voter":token
+      },
+      body:JSON.stringify({
+        clipId:CLIP.id,
+        week:CURRENT_WEEK
+      })
+    });
 
-method:"POST",
+    const data = await res.json();
 
-headers:{
-"content-type":"application/json",
-"x-gtc-voter":token
-},
+    if(!data.ok){
+      setMsg(data.error || "Vote failed", "bad");
+      btn.disabled = false;
+      return;
+    }
 
-body:JSON.stringify({
-clipId:CLIP.id,
-week:CURRENT_WEEK
-})
+    CLIP.votes = Number(data.votes || 0);
 
-});
+    WEEKLY_VOTE = { week: CURRENT_WEEK, clipId: CLIP.id };
+    localStorage.setItem(WEEK_VOTE_KEY, JSON.stringify(WEEKLY_VOTE));
 
-const data=await res.json();
+    updateVoteUi();
+    setMsg("Vote counted ✅", "ok");
 
-if(!data.ok){
+    setTimeout(refreshLiveClip, 1200);
 
-setMsg(data.error||"Vote failed","bad");
-btn.disabled=false;
-return;
-
-}
-
-document.getElementById("voteCount").textContent=data.votes;
-
-WEEKLY_VOTE={week:CURRENT_WEEK,clipId:CLIP.id};
-
-localStorage.setItem(WEEK_VOTE_KEY,JSON.stringify(WEEKLY_VOTE));
-
-btn.textContent="Voted";
-
-setMsg("Vote counted ✅","ok");
-
-}catch(e){
-
-setMsg("Vote failed","bad");
-btn.disabled=false;
-
-}
-
+  }catch(e){
+    setMsg("Vote failed", "bad");
+    btn.disabled = false;
+  }
 }
 
 async function loadClip(){
+  const result = await fetchClipData();
 
-const id=getClipId();
+  if (result.missingId) {
+    document.getElementById("clipContainer").innerHTML = "Clip not found.";
+    return;
+  }
 
-if(!id){
-document.getElementById("clipContainer").innerHTML="Clip not found.";
-return;
+  CURRENT_WEEK = result.week || "";
+  CLIP = result.clip;
+
+  if(!CLIP){
+    document.getElementById("clipContainer").innerHTML = "Clip not found.";
+    return;
+  }
+
+  renderClip();
 }
 
-const res=await fetch("/.netlify/functions/clips-get?t="+Date.now());
-const data=await res.json();
+async function refreshLiveClip(){
+  try{
+    const result = await fetchClipData();
 
-CURRENT_WEEK=data.week;
+    if (result.missingId) return;
+    if (!result.clip) return;
 
-const clips=data.clips||[];
+    CURRENT_WEEK = result.week || "";
+    CLIP = result.clip;
 
-CLIP=clips.find(c=>String(c.id)===String(id));
+    const voteCountEl = document.getElementById("voteCount");
+    if (voteCountEl) {
+      voteCountEl.textContent = String(Number(CLIP.votes || 0));
+    }
 
-if(!CLIP){
-document.getElementById("clipContainer").innerHTML="Clip not found.";
-return;
+    updateVoteUi();
+  }catch(e){
+    // silent retry on next interval
+  }
 }
 
-renderClip();
-
+function startAutoRefresh(){
+  if (AUTO_REFRESH_TIMER) clearInterval(AUTO_REFRESH_TIMER);
+  AUTO_REFRESH_TIMER = setInterval(refreshLiveClip, 8000);
 }
 
-document.addEventListener("DOMContentLoaded",()=>{
+function stopAutoRefresh(){
+  if (AUTO_REFRESH_TIMER) {
+    clearInterval(AUTO_REFRESH_TIMER);
+    AUTO_REFRESH_TIMER = null;
+  }
+}
 
-ensureToken();
-loadClip();
-
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    stopAutoRefresh();
+  } else {
+    refreshLiveClip();
+    startAutoRefresh();
+  }
 });
 
+document.addEventListener("DOMContentLoaded", async () => {
+  ensureToken();
+  await loadClip();
+  startAutoRefresh();
+});
 </script>
 
 </body>
