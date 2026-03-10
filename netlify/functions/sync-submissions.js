@@ -18,7 +18,6 @@ function pick(obj, keys) {
 }
 
 async function getClipsDoc(store, key) {
-  // robust read for legacy formats
   const val = await store.get(key, { type: "json" }).catch(() => null);
   if (!val) return { clips: [] };
   if (Array.isArray(val)) return { clips: val };
@@ -42,9 +41,31 @@ function youtubeThumbFromUrl(clipUrl) {
     }
 
     if (!videoId) return "";
+
     return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
   } catch {
     return "";
+  }
+}
+
+function validateClipUrl(url) {
+  try {
+    const u = new URL(url);
+    const host = u.hostname.toLowerCase();
+
+    if (
+      host.includes("youtube.com") ||
+      host.includes("youtu.be") ||
+      host.includes("tiktok.com") ||
+      host.includes("twitch.tv") ||
+      host.includes("clips.twitch.tv")
+    ) {
+      return true;
+    }
+
+    return false;
+  } catch {
+    return false;
   }
 }
 
@@ -60,12 +81,13 @@ async function apiGet(path) {
     const txt = await res.text();
     throw new Error(`Netlify API ${res.status}: ${txt}`);
   }
+
   return res.json();
 }
 
 export default async (req) => {
   try {
-    // auth (manual URL + auto-sync both use this)
+
     const adminKey = process.env.GTC_ADMIN_KEY;
     if (adminKey) {
       const url = new URL(req.url);
@@ -81,8 +103,8 @@ export default async (req) => {
     const siteId = process.env.NETLIFY_SITE_ID;
     if (!siteId) throw new Error("Missing NETLIFY_SITE_ID");
 
-    // ✅ Competition window guard (CST/CDT)
     const w = getCompetitionWindow(new Date());
+
     if (!w.isOpen) {
       return new Response(JSON.stringify({
         ok: true,
@@ -104,65 +126,87 @@ export default async (req) => {
     const store = getStore("gtc");
     const clipsKey = `clips:${week}`;
 
-    // since aligned to competition start for current week
     const weekSinceISO = requestedWeek
       ? weekStartISO(week)
       : new Date(w.weekStartUtcMs).toISOString();
 
     const weekCutoffISO =
-  (await store.get(`cutoff:${week}`, { type: "text" }).catch(() => "")) || "";
+      (await store.get(`cutoff:${week}`, { type: "text" }).catch(() => "")) || "";
 
-const globalCutoffISO =
-  (await store.get(`global-cutoff`, { type: "text" }).catch(() => "")) || "";
+    const globalCutoffISO =
+      (await store.get(`global-cutoff`, { type: "text" }).catch(() => "")) || "";
 
-let sinceISO = weekSinceISO;
+    let sinceISO = weekSinceISO;
 
-if (globalCutoffISO && globalCutoffISO > sinceISO) {
-  sinceISO = globalCutoffISO;
-}
-if (weekCutoffISO && weekCutoffISO > sinceISO) {
-  sinceISO = weekCutoffISO;
-}
+    if (globalCutoffISO && globalCutoffISO > sinceISO) {
+      sinceISO = globalCutoffISO;
+    }
 
-    // Find the form by name
+    if (weekCutoffISO && weekCutoffISO > sinceISO) {
+      sinceISO = weekCutoffISO;
+    }
+
     const forms = await apiGet(`/sites/${siteId}/forms`);
     const form = forms.find(f => f.name === "clip-submissions");
+
     if (!form) {
       return new Response(JSON.stringify({
         ok: false,
         error: "Form not found",
-        detail: "No form named 'clip-submissions' found on this Netlify site.",
-        foundForms: forms.map(f => f.name).slice(0, 50)
-      }), { status: 404, headers: { "content-type": "application/json; charset=utf-8" } });
+        detail: "No form named 'clip-submissions' found on this Netlify site."
+      }), { status: 404 });
     }
 
-    // ✅ Fetch verified + spam
     const verified = await apiGet(`/forms/${form.id}/submissions?per_page=100`);
     const spam = await apiGet(`/forms/${form.id}/submissions?per_page=100&state=spam`);
     const all = [...verified, ...spam];
 
-    // Filter by sinceISO
     const weeklySubs = all.filter(s => {
       const created = new Date(s.created_at).toISOString();
       return created >= sinceISO;
     });
 
-    // Existing clips (preserve votes + prevent re-adding same submission ID)
     const existingDoc = await getClipsDoc(store, clipsKey);
     const existingClips = existingDoc.clips || [];
-    const byId = new Map(existingClips.map(c => [String(c.id), c]));
 
-    let added = 0, updated = 0, skippedEmpty = 0, skippedAlreadySynced = 0;
+    const byId = new Map(existingClips.map(c => [String(c.id), c]));
+    const existingUrls = new Set(existingClips.map(c => (c.clipUrl || "").trim()));
+
+    let added = 0;
+    let skippedEmpty = 0;
+    let skippedAlreadySynced = 0;
+    let skippedInvalid = 0;
+    let skippedDuplicate = 0;
 
     for (const s of weeklySubs) {
+
       const data = s.data || {};
       const clipUrl = escTrim(pick(data, ["clipUrl", "clip_url", "url", "link"]));
-      if (!clipUrl) { skippedEmpty++; continue; }
+
+      if (!clipUrl) {
+        skippedEmpty++;
+        continue;
+      }
+
+      if (!validateClipUrl(clipUrl)) {
+        skippedInvalid++;
+        continue;
+      }
+
+      if (existingUrls.has(clipUrl)) {
+        skippedDuplicate++;
+        continue;
+      }
 
       const id = String(s.id);
-      if (byId.has(id)) { skippedAlreadySynced++; continue; }
+
+      if (byId.has(id)) {
+        skippedAlreadySynced++;
+        continue;
+      }
 
       let thumbUrl = escTrim(pick(data, ["thumbUrl", "thumb_url", "thumbnail", "thumbnailUrl"]));
+
       const title = escTrim(pick(data, ["title", "clipTitle", "clip_title"]));
       const gamerTag = escTrim(pick(data, ["gamerTag", "gamertag", "gamer_tag"]));
       const game = escTrim(pick(data, ["game", "gameTitle", "game_title"]));
@@ -183,37 +227,40 @@ if (weekCutoffISO && weekCutoffISO > sinceISO) {
       };
 
       byId.set(id, newClip);
+      existingUrls.add(clipUrl);
       added++;
     }
 
-    // Sort newest first
     const merged = Array.from(byId.values());
+
     merged.sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0));
 
-    // ✅ IMPORTANT: persist correctly
-    await store.setJSON(clipsKey, { clips: merged }, { metadata: { updatedAt: new Date().toISOString() } });
+    await store.setJSON(clipsKey, { clips: merged }, {
+      metadata: { updatedAt: new Date().toISOString() }
+    });
 
     return new Response(JSON.stringify({
       ok: true,
       week,
-      form: { id: form.id, name: form.name },
-      since: sinceISO,
-      verifiedFetched: verified.length,
-      spamFetched: spam.length,
       submissionsThisWeek: weeklySubs.length,
       clipsBefore: existingClips.length,
       clipsAfter: merged.length,
       added,
-      updated,
       skippedEmpty,
-      skippedAlreadySynced
+      skippedAlreadySynced,
+      skippedInvalid,
+      skippedDuplicate
     }), {
       status: 200,
       headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }
     });
 
   } catch (err) {
-    return new Response(JSON.stringify({ ok: false, error: "sync failed", detail: String(err) }), {
+    return new Response(JSON.stringify({
+      ok: false,
+      error: "sync failed",
+      detail: String(err)
+    }), {
       status: 500,
       headers: { "content-type": "application/json; charset=utf-8" }
     });
