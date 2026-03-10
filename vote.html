@@ -311,6 +311,8 @@ Share
 
 </div>
 
+<div class="msg" id="pressure-${id}"></div>
+
 ${c.clipUrl?`<div class="msg"><a href="${esc(c.clipUrl)}" target="_blank">Watch Clip →</a></div>`:""}
 
 <div class="msg" id="m-${id}"></div>
@@ -325,8 +327,32 @@ return el;
 function wireVotes(container){
 
 container.querySelectorAll(".voteBtn").forEach(btn=>{
-
 btn.onclick=()=>vote(btn);
+});
+
+}
+
+function applyLeaderboardPressure(clips){
+
+if(clips.length<3)return;
+
+const sorted=[...clips].sort((a,b)=>b.votes-a.votes);
+
+const leaderVotes=sorted[0].votes;
+const thirdVotes=sorted[2].votes;
+
+clips.forEach(c=>{
+
+const el=document.getElementById(`pressure-${c.id}`);
+if(!el)return;
+
+const diff=thirdVotes-c.votes+1;
+
+if(c.votes>=thirdVotes){
+el.innerHTML=`🔥 Leader: ${leaderVotes} votes`;
+}else{
+el.innerHTML=`📈 Need ${diff} vote${diff===1?"":"s"} to reach Top 3`;
+}
 
 });
 
@@ -362,6 +388,8 @@ rest.forEach(c=>allGrid.appendChild(renderCard(c)));
 
 wireVotes(topGrid);
 wireVotes(allGrid);
+
+applyLeaderboardPressure(clips);
 
 if(userVoted()){
 lockVotes();
