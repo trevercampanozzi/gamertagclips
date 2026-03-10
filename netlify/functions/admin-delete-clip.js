@@ -33,9 +33,11 @@ export default async (req) => {
   const afterClips = clips.filter(c => String(c.id) !== clipId);
   const removed = before - afterClips.length;
 
-  // Save back (keep same shape your app expects: either {clips:[...]} or just [...])
-  // We’ll store as {clips:[...]} to be explicit.
-  await store.set(key, { clips: afterClips }, { metadata: { updatedAt: new Date().toISOString() } });
+  await store.setJSON(
+    key,
+    { clips: afterClips },
+    { metadata: { updatedAt: new Date().toISOString() } }
+  );
 
   return json(200, { ok: true, week, removed, before, after: afterClips.length, key });
 };
