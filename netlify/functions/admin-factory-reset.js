@@ -41,11 +41,11 @@ export default async (req) => {
   }
 
   const store = getStore("gtc");
+  const nowIso = new Date().toISOString();
   let deletedKeys = [];
 
   const prefixes = [
     "clips:",
-    "cutoff:",
     "state:",
     "winner:",
     "top3:",
@@ -60,9 +60,13 @@ export default async (req) => {
     deletedKeys.push(...keys);
   }
 
+  // IMPORTANT: do NOT delete cutoffs — move them forward instead
+  await store.set("global-cutoff", nowIso);
+
   return json(200, {
     ok: true,
     deleted: deletedKeys.length,
+    globalCutoffSetTo: nowIso,
     deletedKeys
   });
 };
