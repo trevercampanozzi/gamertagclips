@@ -58,7 +58,6 @@ export default async (req) => {
     deletedKeys.push(key);
   }
 
-  // delete all vote locks / attempt locks for this week
   const prefixDeletes = [
     `vote:${week}:`,
     `vote-ip:${week}:`,
@@ -71,7 +70,7 @@ export default async (req) => {
     deletedKeys.push(...keys);
   }
 
-  // IMPORTANT: move sync baseline forward so old submissions do not come back
+  // Keep old submissions from coming back for this week
   await store.set(`cutoff:${week}`, nowIso);
 
   return json(200, {
