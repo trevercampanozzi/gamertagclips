@@ -262,6 +262,15 @@
         <p class="title">${esc(c.title)}</p>
         <p class="sub">${[c.gamerTag && `@${esc(c.gamerTag)}`, esc(c.game)].filter(Boolean).join(' • ')}</p>
 
+<p class="sub" style="font-size:12px;opacity:.6">
+  Submitted: ${new Date(c.submittedAt).toLocaleString(undefined,{
+    month:"short",
+    day:"numeric",
+    hour:"numeric",
+    minute:"2-digit"
+  })}
+</p>
+
         <div class="row">
           <span class="pill">
             ${opts?.rank ? `<span class="rank">#${opts.rank}</span>` : ""}
