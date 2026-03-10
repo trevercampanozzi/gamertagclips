@@ -154,66 +154,98 @@
     </div>
   </div>
 
-  <script>
-  const form = document.getElementById("clipForm");
-  const successBox = document.getElementById("successBox");
-  const errorBox = document.getElementById("errorBox");
-  const submitBtn = document.getElementById("submitBtn");
+ <script>
+const form = document.getElementById("clipForm");
+const successBox = document.getElementById("successBox");
+const errorBox = document.getElementById("errorBox");
+const submitBtn = document.getElementById("submitBtn");
+const clipInput = document.getElementById("clip_url");
 
-  function showSuccess() {
-    errorBox.style.display = "none";
-    successBox.style.display = "block";
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-  function showError(msg = "❌ Submission failed. Please try again.") {
-    successBox.style.display = "none";
-    errorBox.style.display = "block";
-    errorBox.textContent = msg;
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
+function showSuccess() {
+  errorBox.style.display = "none";
+  successBox.style.display = "block";
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
 
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
+function showError(msg = "❌ Submission failed. Please try again.") {
+  successBox.style.display = "none";
+  errorBox.style.display = "block";
+  errorBox.textContent = msg;
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
 
-    successBox.style.display = "none";
-    errorBox.style.display = "none";
+function validateClipUrl(url) {
+  try {
+    const u = new URL(url);
+    const host = u.hostname.toLowerCase();
 
-    // ✅ Hard block if captcha not completed
-    const captchaEl = form.querySelector('[name="g-recaptcha-response"]');
-    const captchaVal = captchaEl ? String(captchaEl.value || "").trim() : "";
-    if (!captchaVal) {
-      showError("❌ Please complete the captcha.");
-      return;
+    if (
+      host.includes("youtube.com") ||
+      host.includes("youtu.be") ||
+      host.includes("tiktok.com") ||
+      host.includes("twitch.tv") ||
+      host.includes("clips.twitch.tv")
+    ) {
+      return true;
     }
 
-    submitBtn.disabled = true;
-    submitBtn.textContent = "Submitting. . .";
+    return false;
+  } catch {
+    return false;
+  }
+}
 
-    try {
-      const formData = new FormData(form);
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
 
-      const postTo = "/submit";
+  successBox.style.display = "none";
+  errorBox.style.display = "none";
 
-      const res = await fetch(postTo, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams(formData).toString()
-      });
+  const clipUrl = clipInput.value.trim();
 
-      // ✅ Only success on a true 2xx response
-      if (res.ok) {
-        form.reset();
-        showSuccess();
-      } else {
-        showError("❌ Submission blocked. Please try again.");
-      }
-    } catch (err) {
-      showError("❌ Submission failed. Please try again.");
-    } finally {
-      submitBtn.disabled = false;
-      submitBtn.textContent = "Submit Clip";
+  // ✅ platform validation
+  if (!validateClipUrl(clipUrl)) {
+    showError("❌ Only YouTube, TikTok, or Twitch clips are allowed.");
+    return;
+  }
+
+  // ✅ captcha validation
+  const captchaEl = form.querySelector('[name="g-recaptcha-response"]');
+  const captchaVal = captchaEl ? String(captchaEl.value || "").trim() : "";
+
+  if (!captchaVal) {
+    showError("❌ Please complete the captcha.");
+    return;
+  }
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Submitting...";
+
+  try {
+
+    const formData = new FormData(form);
+
+    const res = await fetch("/submit", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams(formData).toString()
+    });
+
+    if (res.ok) {
+      form.reset();
+      showSuccess();
+    } else {
+      showError("❌ Submission blocked. Please try again.");
     }
-  });
+
+  } catch {
+    showError("❌ Submission failed. Please try again.");
+  }
+
+  submitBtn.disabled = false;
+  submitBtn.textContent = "Submit Clip";
+
+});
 </script>
 </body>
 </html>
