@@ -109,8 +109,20 @@ export default async (req) => {
       ? weekStartISO(week)
       : new Date(w.weekStartUtcMs).toISOString();
 
-    const cutoffISO = (await store.get(`cutoff:${week}`, { type: "text" }).catch(() => "")) || "";
-    const sinceISO = cutoffISO && cutoffISO > weekSinceISO ? cutoffISO : weekSinceISO;
+    const weekCutoffISO =
+  (await store.get(`cutoff:${week}`, { type: "text" }).catch(() => "")) || "";
+
+const globalCutoffISO =
+  (await store.get(`global-cutoff`, { type: "text" }).catch(() => "")) || "";
+
+let sinceISO = weekSinceISO;
+
+if (globalCutoffISO && globalCutoffISO > sinceISO) {
+  sinceISO = globalCutoffISO;
+}
+if (weekCutoffISO && weekCutoffISO > sinceISO) {
+  sinceISO = weekCutoffISO;
+}
 
     // Find the form by name
     const forms = await apiGet(`/sites/${siteId}/forms`);
