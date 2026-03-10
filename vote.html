@@ -1,456 +1,455 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Vote — GamerTagClips</title>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Vote — GamerTagClips</title>
 
-  <style>
-    :root{
-      --bg:#0b0f19;
-      --panel:rgba(255,255,255,.04);
-      --border:rgba(255,255,255,.10);
-      --text:#e8eefc;
-      --muted:rgba(232,238,252,.78);
-      --blue:#2d6cff;
-      --green:#61ffb0;
-      --red:#ff7a7a;
-      --gold:#ffd56a;
-    }
-    *{box-sizing:border-box}
-    body{
-      margin:0;
-      font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-      background:var(--bg);
-      color:var(--text);
-    }
-    header{
-      padding:18px 16px;
-      border-bottom:1px solid rgba(255,255,255,.08);
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:12px;
-      flex-wrap:wrap;
-    }
-    header strong{letter-spacing:.2px}
-    nav a{
-      color:#9cc2ff;
-      text-decoration:none;
-      font-weight:700;
-    }
-    nav a:hover{text-decoration:underline}
-    .wrap{max-width:1100px;margin:0 auto;padding:16px}
+<style>
 
-    .meta{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:10px;
-      flex-wrap:wrap;
-      opacity:.92;
-      margin:10px 0 18px;
-    }
-    .meta-left{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-    .pill{
-      font-size:12px;
-      padding:6px 10px;
-      border-radius:999px;
-      background:rgba(255,255,255,.07);
-      border:1px solid rgba(255,255,255,.10);
-      color:var(--text);
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-    }
+:root{
+--bg:#0b0f19;
+--panel:rgba(255,255,255,.04);
+--border:rgba(255,255,255,.10);
+--text:#e8eefc;
+--muted:rgba(232,238,252,.78);
+--blue:#2d6cff;
+--green:#61ffb0;
+--red:#ff7a7a;
+--gold:#ffd56a;
+}
 
-    .section-title{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:10px;
-      margin:16px 0 10px;
-      flex-wrap:wrap;
-    }
-    .section-title h2{
-      margin:0;
-      font-size:16px;
-      letter-spacing:.2px;
-    }
-    .section-title .hint{
-      opacity:.78;
-      font-size:12px;
-    }
+*{box-sizing:border-box}
 
-    .grid{
-      display:grid;
-      grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
-      gap:12px;
-    }
+body{
+margin:0;
+font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+background:var(--bg);
+color:var(--text);
+}
 
-    .card{
-      background:var(--panel);
-      border:1px solid rgba(255,255,255,.08);
-      border-radius:14px;
-      overflow:hidden;
-    }
-    .card.leader{
-      border-color: rgba(255,213,106,.35);
-      box-shadow: 0 0 0 1px rgba(255,213,106,.08) inset;
-    }
+header{
+padding:18px 16px;
+border-bottom:1px solid rgba(255,255,255,.08);
+display:flex;
+align-items:center;
+justify-content:space-between;
+flex-wrap:wrap;
+}
 
-    .thumb{
-      width:100%;
-      aspect-ratio:16/9;
-      background:#111;
-      display:block;
-      object-fit:cover;
-    }
-    .pad{padding:12px}
-    .title{
-      font-weight:900;
-      margin:0 0 6px;
-      font-size:16px;
-      line-height:1.2;
-      word-break:break-word;
-    }
-    .sub{
-      opacity:.82;
-      font-size:13px;
-      margin:0 0 10px;
-    }
-    .row{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:10px;
-      flex-wrap:wrap;
-    }
-    .rank{
-      font-weight:900;
-      color:var(--gold);
-    }
-    button{
-      background:var(--blue);
-      color:white;
-      border:0;
-      border-radius:10px;
-      padding:10px 12px;
-      font-weight:900;
-      cursor:pointer;
-    }
-    button[disabled]{opacity:.55;cursor:not-allowed}
-    .msg{margin-top:10px;font-size:13px}
-    .ok{color:var(--green)}
-    .bad{color:var(--red)}
-    .footer{
-      opacity:.7;
-      margin:18px 0 0;
-      font-size:12px;
-      line-height:1.35;
-    }
-    .link{
-      color:#9cc2ff;
-      text-decoration:none;
-      font-weight:800;
-    }
-    .link:hover{text-decoration:underline}
-  </style>
+nav a{
+color:#9cc2ff;
+text-decoration:none;
+font-weight:700;
+}
+
+.wrap{
+max-width:1100px;
+margin:auto;
+padding:16px;
+}
+
+.meta{
+display:flex;
+justify-content:space-between;
+flex-wrap:wrap;
+margin-bottom:18px;
+}
+
+.pill{
+font-size:12px;
+padding:6px 10px;
+border-radius:999px;
+background:rgba(255,255,255,.07);
+border:1px solid rgba(255,255,255,.10);
+}
+
+.section-title{
+margin:20px 0 10px;
+display:flex;
+justify-content:space-between;
+flex-wrap:wrap;
+}
+
+.grid{
+display:grid;
+grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
+gap:12px;
+}
+
+.card{
+background:var(--panel);
+border:1px solid rgba(255,255,255,.08);
+border-radius:14px;
+overflow:hidden;
+}
+
+.card.leader{
+border-color:rgba(255,213,106,.35);
+}
+
+.thumb{
+width:100%;
+aspect-ratio:16/9;
+background:#111;
+object-fit:cover;
+}
+
+.pad{
+padding:12px;
+}
+
+.title{
+font-weight:900;
+margin:0 0 6px;
+}
+
+.sub{
+opacity:.8;
+font-size:13px;
+margin-bottom:10px;
+}
+
+.row{
+display:flex;
+justify-content:space-between;
+align-items:center;
+gap:10px;
+flex-wrap:wrap;
+}
+
+.rank{
+color:var(--gold);
+font-weight:900;
+}
+
+button{
+background:var(--blue);
+color:white;
+border:0;
+border-radius:10px;
+padding:10px 12px;
+font-weight:900;
+cursor:pointer;
+}
+
+.shareBtn{
+background:#334155;
+}
+
+button[disabled]{
+opacity:.5;
+cursor:not-allowed;
+}
+
+.msg{
+margin-top:8px;
+font-size:13px;
+}
+
+.ok{color:var(--green)}
+.bad{color:var(--red)}
+
+.footer{
+opacity:.7;
+margin-top:20px;
+font-size:12px;
+}
+
+</style>
 </head>
 
 <body>
-  <header>
-    <div><strong>GamerTagClips</strong> — Vote</div>
-    <nav>
-      <a href="/">Home</a> ·
-      <a href="/submit.html">Submit</a>
-    </nav>
-  </header>
 
-  <div class="wrap">
-    <div class="meta">
-      <div class="meta-left">
-        <span class="pill" id="weekPill">Week: …</span>
-        <span class="pill" id="countPill">Clips: …</span>
-      </div>
-      <span class="pill" id="statusPill">Loading…</span>
-    </div>
+<header>
+<div><strong>GamerTagClips</strong> — Vote</div>
+<nav>
+<a href="/">Home</a> ·
+<a href="/submit.html">Submit</a>
+</nav>
+</header>
 
-    <div class="section-title">
-      <h2>🥇🥈🥉 Top 3 This Week</h2>
-      <div class="hint">Highest votes (ties break by earliest submission).</div>
-    </div>
-    <div class="grid" id="topGrid"></div>
+<div class="wrap">
 
-    <div class="section-title">
-      <h2>🗂️ All Clips (Newest First)</h2>
-      <div class="hint" id="allHint">Excludes the Top 3 so nothing is duplicated.</div>
-    </div>
-    <div class="grid" id="allGrid"></div>
+<div class="meta">
+<span class="pill" id="weekPill">Week: …</span>
+<span class="pill" id="countPill">Clips: …</span>
+<span class="pill" id="statusPill">Loading…</span>
+</div>
 
-    <div class="footer">
-      Voting is rate-limited per clip per IP.
-    </div>
-  </div>
+<div class="section-title">
+<h2>🥇🥈🥉 Top 3 This Week</h2>
+</div>
+
+<div class="grid" id="topGrid"></div>
+
+<div class="section-title">
+<h2>🗂️ All Clips (Newest First)</h2>
+</div>
+
+<div class="grid" id="allGrid"></div>
+
+<div class="footer">
+Voting limited to one vote per week per device.
+</div>
+
+</div>
 
 <script>
-  const weekPill = document.getElementById('weekPill');
-  const countPill = document.getElementById('countPill');
-  const statusPill = document.getElementById('statusPill');
 
-  const topGrid = document.getElementById('topGrid');
-  const allGrid = document.getElementById('allGrid');
-  const allHint = document.getElementById('allHint');
+const weekPill=document.getElementById("weekPill");
+const countPill=document.getElementById("countPill");
+const statusPill=document.getElementById("statusPill");
 
-  let CURRENT_WEEK = "";
-  let CLIPS_BY_ID = new Map();
+const topGrid=document.getElementById("topGrid");
+const allGrid=document.getElementById("allGrid");
 
-  const BROWSER_VOTER_TOKEN_KEY = "gtcVoterToken";
-  const WEEK_VOTE_KEY = "gtcWeekVote";
+let CURRENT_WEEK="";
+let CLIPS_BY_ID=new Map();
 
-  let WEEKLY_VOTE = JSON.parse(localStorage.getItem(WEEK_VOTE_KEY) || "{}");
+const TOKEN_KEY="gtcVoterToken";
+const WEEK_VOTE_KEY="gtcWeekVote";
 
-  function ensureBrowserVoterToken() {
-    let token = localStorage.getItem(BROWSER_VOTER_TOKEN_KEY);
-    if (!token) {
-      token = crypto.randomUUID();
-      localStorage.setItem(BROWSER_VOTER_TOKEN_KEY, token);
-    }
-    return token;
-  }
+let WEEKLY_VOTE=JSON.parse(localStorage.getItem(WEEK_VOTE_KEY)||"{}");
 
-  function esc(s) {
-    return String(s || "").replace(/[&<>"']/g, m => ({
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      '"': "&quot;",
-      "'": "&#39;"
-    }[m]));
-  }
+function ensureToken(){
 
-  function setStatus(text, kind) {
-    statusPill.textContent = text;
-    statusPill.style.borderColor = 'rgba(255,255,255,.10)';
-    if (kind === 'ok') statusPill.style.borderColor = 'rgba(97,255,176,.35)';
-    if (kind === 'bad') statusPill.style.borderColor = 'rgba(255,122,122,.35)';
-  }
+let token=localStorage.getItem(TOKEN_KEY);
 
-  function normalizeClip(c) {
-    return {
-      id: c.id,
-      title: c.title || 'Untitled Clip',
-      gamerTag: c.gamerTag || c.gamertag || '',
-      game: c.game || '',
-      votes: Number(c.votes || 0),
-      submittedAt: c.submittedAt || '',
-      thumbUrl: c.thumbUrl || '',
-      clipUrl: c.clipUrl || ''
-    };
-  }
+if(!token){
+token=crypto.randomUUID();
+localStorage.setItem(TOKEN_KEY,token);
+}
 
-  function userAlreadyVoted() {
-    return WEEKLY_VOTE.week === CURRENT_WEEK;
-  }
+return token;
+}
 
-  function lockAllVotes() {
-    document.querySelectorAll("button[data-id]").forEach(btn => {
-      btn.disabled = true;
-      btn.textContent = "Vote Locked";
-    });
+function esc(s){
+return String(s||"").replace(/[&<>"']/g,m=>({
+"&":"&amp;",
+"<":"&lt;",
+">":"&gt;",
+'"':"&quot;",
+"'":"&#39;"
+}[m]));
+}
 
-    if (WEEKLY_VOTE.clipId) {
-      document.querySelectorAll(`button[data-id="${CSS.escape(String(WEEKLY_VOTE.clipId))}"]`).forEach(btn => {
-        btn.textContent = "Voted";
-      });
-    }
-  }
+function setStatus(text){
+statusPill.textContent=text;
+}
 
-  function formatSubmittedAt(submittedAt) {
-    const t = new Date(submittedAt);
-    if (Number.isNaN(t.getTime())) return "Unknown";
-    return t.toLocaleString(undefined, {
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit"
-    });
-  }
+function userVoted(){
+return WEEKLY_VOTE.week===CURRENT_WEEK;
+}
 
-  function renderCard(c, opts) {
-    const id = esc(c.id);
-    const votes = Number(c.votes || 0);
-    const alreadyVoted = userAlreadyVoted();
-    const votedThisClip = alreadyVoted && String(WEEKLY_VOTE.clipId || "") === String(c.id);
+function lockVotes(){
 
-    const el = document.createElement('div');
-    el.className = `card ${opts?.leader ? 'leader' : ''}`;
+document.querySelectorAll("button.voteBtn").forEach(b=>{
+b.disabled=true;
+b.textContent="Vote Locked";
+});
 
-    el.innerHTML = `
-      ${c.thumbUrl ? `<img class="thumb" src="${esc(c.thumbUrl)}" alt="${esc(c.title)}">` : `<div class="thumb"></div>`}
-      <div class="pad">
-        <p class="title">${esc(c.title)}</p>
+if(WEEKLY_VOTE.clipId){
+document.querySelectorAll(`button[data-id="${WEEKLY_VOTE.clipId}"]`)
+.forEach(b=>b.textContent="Voted");
+}
 
-        <p class="sub">${[c.gamerTag && `@${esc(c.gamerTag)}`, esc(c.game)].filter(Boolean).join(' • ')}</p>
+}
 
-        <p class="sub" style="font-size:12px;opacity:.6">
-          Submitted: ${formatSubmittedAt(c.submittedAt)}
-        </p>
+function shareClip(id){
 
-        <div class="row">
-          <span class="pill">
-            ${opts?.rank ? `<span class="rank">#${opts.rank}</span>` : ""}
-            <strong class="voteCount" id="vc-${id}">${votes}</strong> vote(s)
-          </span>
+const url=`${window.location.origin}/clip.html?id=${id}`;
 
-          <button data-id="${id}" ${alreadyVoted ? "disabled" : ""}>
-            ${alreadyVoted ? (votedThisClip ? "Voted" : "Vote Locked") : "Vote"}
-          </button>
-        </div>
+navigator.clipboard.writeText(url);
 
-        ${c.clipUrl ? `<div class="msg"><a class="link" href="${esc(c.clipUrl)}" target="_blank" rel="noopener">Watch clip →</a></div>` : ``}
-        <div class="msg" id="m-${id}"></div>
-      </div>
-    `;
+alert("Clip link copied! Share it to get votes.");
 
-    return el;
-  }
+}
 
-  function wireVotes(container) {
-    container.querySelectorAll('button[data-id]').forEach(btn => {
-      btn.addEventListener('click', () => vote(btn));
-    });
-  }
+function renderCard(c,rank){
 
-  async function loadClips() {
-    const res = await fetch(`/.netlify/functions/clips-get?t=${Date.now()}`, {
-      cache: "no-store"
-    });
-    const data = await res.json();
+const id=esc(c.id);
 
-    CURRENT_WEEK = data.week || "";
-    weekPill.textContent = `Week: ${data.week || "—"}`;
-    countPill.textContent = `Clips: ${data.count ?? 0}`;
+const voted=userVoted();
+const votedThis=voted&&WEEKLY_VOTE.clipId===c.id;
 
-    const clips = Array.isArray(data.clips) ? data.clips.map(normalizeClip) : [];
+const el=document.createElement("div");
 
-    CLIPS_BY_ID = new Map();
-    clips.forEach(c => CLIPS_BY_ID.set(String(c.id), c));
+el.className="card"+(rank?" leader":"");
 
-    const top3 = [...clips].sort((a, b) => {
-      const voteDiff = Number(b.votes || 0) - Number(a.votes || 0);
-      if (voteDiff !== 0) return voteDiff;
+el.innerHTML=`
 
-      const aTime = Date.parse(a.submittedAt || 0) || 0;
-      const bTime = Date.parse(b.submittedAt || 0) || 0;
-      return aTime - bTime; // earliest submission wins ties
-    }).slice(0, 3);
+${c.thumbUrl?`<img class="thumb" src="${esc(c.thumbUrl)}">`:`<div class="thumb"></div>`}
 
-    const topIds = new Set(top3.map(c => String(c.id)));
+<div class="pad">
 
-    const allSorted = clips
-      .filter(c => !topIds.has(String(c.id)))
-      .sort((a, b) => {
-        const bTime = Date.parse(b.submittedAt || 0) || 0;
-        const aTime = Date.parse(a.submittedAt || 0) || 0;
-        return bTime - aTime; // newest first
-      });
+<p class="title">${esc(c.title)}</p>
 
-    allHint.textContent = `Excludes the Top 3 so nothing is duplicated. (${allSorted.length} clip${allSorted.length === 1 ? "" : "s"} below)`;
+<p class="sub">${esc(c.gamerTag||"")} • ${esc(c.game||"")}</p>
 
-    topGrid.innerHTML = "";
-    top3.forEach((c, i) => topGrid.appendChild(renderCard(c, { rank: i + 1, leader: true })));
+<div class="row">
 
-    allGrid.innerHTML = "";
-    allSorted.forEach(c => allGrid.appendChild(renderCard(c)));
+<span class="pill">
 
-    wireVotes(topGrid);
-    wireVotes(allGrid);
+${rank?`<span class="rank">#${rank}</span>`:""}
 
-    if (userAlreadyVoted()) {
-      lockAllVotes();
-      setStatus("Vote already cast this week", "ok");
-    } else {
-      setStatus("Ready to vote", "ok");
-    }
-  }
+<strong id="vc-${id}">${c.votes}</strong> votes
 
-  function setVoteCount(clipId, votes) {
-    const el = document.getElementById(`vc-${clipId}`);
-    if (el) el.textContent = String(votes);
-  }
+</span>
 
-  function setMsg(clipId, text, kind) {
-    const msg = document.getElementById(`m-${clipId}`);
-    if (!msg) return;
-    msg.className = "msg " + (kind === "ok" ? "ok" : "bad");
-    msg.textContent = text;
-  }
+<div style="display:flex;gap:6px;">
 
-  async function vote(btn) {
-    if (userAlreadyVoted()) {
-      lockAllVotes();
-      return;
-    }
+<button class="voteBtn" data-id="${id}" ${voted?"disabled":""}>
+${voted?(votedThis?"Voted":"Vote Locked"):"Vote"}
+</button>
 
-    const clipId = btn.getAttribute("data-id");
-    if (!clipId) return;
+<button class="shareBtn" onclick="shareClip('${id}')">
+Share
+</button>
 
-    btn.disabled = true;
+</div>
 
-    try {
-      const voterToken = ensureBrowserVoterToken();
+</div>
 
-      const res = await fetch("/.netlify/functions/vote-post", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-gtc-voter": voterToken
-        },
-        body: JSON.stringify({ clipId, week: CURRENT_WEEK })
-      });
+${c.clipUrl?`<div class="msg"><a href="${esc(c.clipUrl)}" target="_blank">Watch Clip →</a></div>`:""}
 
-      const data = await res.json();
+<div class="msg" id="m-${id}"></div>
 
-      if (!data.ok) {
-        setMsg(clipId, data.error || "Vote failed", "bad");
+</div>
+`;
 
-        if (String(data.error || "").toLowerCase().includes("already voted")) {
-          WEEKLY_VOTE = { week: CURRENT_WEEK, clipId: data.votedClipId || clipId };
-          localStorage.setItem(WEEK_VOTE_KEY, JSON.stringify(WEEKLY_VOTE));
-          lockAllVotes();
-          setStatus("Vote already cast this week", "ok");
-          return;
-        }
+return el;
 
-        btn.disabled = false;
-        return;
-      }
+}
 
-      setVoteCount(clipId, data.votes);
+function wireVotes(container){
 
-      if (data.token) {
-        localStorage.setItem(BROWSER_VOTER_TOKEN_KEY, data.token);
-      }
+container.querySelectorAll(".voteBtn").forEach(btn=>{
 
-      WEEKLY_VOTE = { week: CURRENT_WEEK, clipId };
-      localStorage.setItem(WEEK_VOTE_KEY, JSON.stringify(WEEKLY_VOTE));
+btn.onclick=()=>vote(btn);
 
-      setMsg(clipId, "Vote counted ✅", "ok");
-      setStatus("Vote already cast this week", "ok");
+});
 
-      lockAllVotes();
+}
 
-    } catch (e) {
-      setMsg(clipId, "Vote failed", "bad");
-      btn.disabled = false;
-    }
-  }
+async function loadClips(){
 
-  document.addEventListener("DOMContentLoaded", () => {
-    ensureBrowserVoterToken();
-    loadClips();
-  });
+const res=await fetch(`/.netlify/functions/clips-get?t=${Date.now()}`,{cache:"no-store"});
+const data=await res.json();
+
+CURRENT_WEEK=data.week||"";
+
+weekPill.textContent=`Week: ${data.week}`;
+countPill.textContent=`Clips: ${data.count}`;
+
+const clips=data.clips||[];
+
+clips.forEach(c=>CLIPS_BY_ID.set(String(c.id),c));
+
+const top=[...clips].sort((a,b)=>b.votes-a.votes).slice(0,3);
+
+const topIds=new Set(top.map(c=>String(c.id)));
+
+const rest=clips
+.filter(c=>!topIds.has(String(c.id)))
+.sort((a,b)=>new Date(b.submittedAt)-new Date(a.submittedAt));
+
+topGrid.innerHTML="";
+top.forEach((c,i)=>topGrid.appendChild(renderCard(c,i+1)));
+
+allGrid.innerHTML="";
+rest.forEach(c=>allGrid.appendChild(renderCard(c)));
+
+wireVotes(topGrid);
+wireVotes(allGrid);
+
+if(userVoted()){
+lockVotes();
+setStatus("Vote already cast this week");
+}else{
+setStatus("Ready to vote");
+}
+
+}
+
+function setVoteCount(id,v){
+const el=document.getElementById(`vc-${id}`);
+if(el) el.textContent=v;
+}
+
+function setMsg(id,msg,type){
+const el=document.getElementById(`m-${id}`);
+if(!el)return;
+el.className="msg "+(type==="ok"?"ok":"bad");
+el.textContent=msg;
+}
+
+async function vote(btn){
+
+if(userVoted()){
+lockVotes();
+return;
+}
+
+const id=btn.getAttribute("data-id");
+
+btn.disabled=true;
+
+try{
+
+const token=ensureToken();
+
+const res=await fetch("/.netlify/functions/vote-post",{
+
+method:"POST",
+
+headers:{
+"content-type":"application/json",
+"x-gtc-voter":token
+},
+
+body:JSON.stringify({clipId:id,week:CURRENT_WEEK})
+
+});
+
+const data=await res.json();
+
+if(!data.ok){
+setMsg(id,data.error||"Vote failed","bad");
+btn.disabled=false;
+return;
+}
+
+setVoteCount(id,data.votes);
+
+WEEKLY_VOTE={week:CURRENT_WEEK,clipId:id};
+
+localStorage.setItem(WEEK_VOTE_KEY,JSON.stringify(WEEKLY_VOTE));
+
+setMsg(id,"Vote counted ✅","ok");
+
+setStatus("Vote already cast this week");
+
+lockVotes();
+
+}catch(e){
+
+setMsg(id,"Vote failed","bad");
+btn.disabled=false;
+
+}
+
+}
+
+document.addEventListener("DOMContentLoaded",()=>{
+
+ensureToken();
+
+loadClips();
+
+});
+
 </script>
+
 </body>
 </html>
