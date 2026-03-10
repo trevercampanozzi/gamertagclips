@@ -203,25 +203,40 @@
   const allHint = document.getElementById('allHint');
 
   let CURRENT_WEEK = "";
-
   let CLIPS_BY_ID = new Map();
 
+  const BROWSER_VOTER_TOKEN_KEY = "gtcVoterToken";
   const WEEK_VOTE_KEY = "gtcWeekVote";
 
   let WEEKLY_VOTE = JSON.parse(localStorage.getItem(WEEK_VOTE_KEY) || "{}");
 
-  function esc(s){
-    return String(s||"").replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m]));
+  function ensureBrowserVoterToken() {
+    let token = localStorage.getItem(BROWSER_VOTER_TOKEN_KEY);
+    if (!token) {
+      token = crypto.randomUUID();
+      localStorage.setItem(BROWSER_VOTER_TOKEN_KEY, token);
+    }
+    return token;
   }
 
-  function setStatus(text, kind){
+  function esc(s) {
+    return String(s || "").replace(/[&<>"']/g, m => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;"
+    }[m]));
+  }
+
+  function setStatus(text, kind) {
     statusPill.textContent = text;
     statusPill.style.borderColor = 'rgba(255,255,255,.10)';
-    if(kind === 'ok') statusPill.style.borderColor = 'rgba(97,255,176,.35)';
-    if(kind === 'bad') statusPill.style.borderColor = 'rgba(255,122,122,.35)';
+    if (kind === 'ok') statusPill.style.borderColor = 'rgba(97,255,176,.35)';
+    if (kind === 'bad') statusPill.style.borderColor = 'rgba(255,122,122,.35)';
   }
 
-  function normalizeClip(c){
+  function normalizeClip(c) {
     return {
       id: c.id,
       title: c.title || 'Untitled Clip',
@@ -234,42 +249,53 @@
     };
   }
 
-  function userAlreadyVoted(){
+  function userAlreadyVoted() {
     return WEEKLY_VOTE.week === CURRENT_WEEK;
   }
 
-  function lockAllVotes(){
-    document.querySelectorAll("button[data-id]").forEach(btn=>{
+  function lockAllVotes() {
+    document.querySelectorAll("button[data-id]").forEach(btn => {
       btn.disabled = true;
       btn.textContent = "Vote Locked";
     });
+
+    if (WEEKLY_VOTE.clipId) {
+      document.querySelectorAll(`button[data-id="${CSS.escape(String(WEEKLY_VOTE.clipId))}"]`).forEach(btn => {
+        btn.textContent = "Voted";
+      });
+    }
   }
 
-  function renderCard(c, opts){
+  function formatSubmittedAt(submittedAt) {
+    const t = new Date(submittedAt);
+    if (Number.isNaN(t.getTime())) return "Unknown";
+    return t.toLocaleString(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit"
+    });
+  }
 
+  function renderCard(c, opts) {
     const id = esc(c.id);
     const votes = Number(c.votes || 0);
-
     const alreadyVoted = userAlreadyVoted();
+    const votedThisClip = alreadyVoted && String(WEEKLY_VOTE.clipId || "") === String(c.id);
 
     const el = document.createElement('div');
-
     el.className = `card ${opts?.leader ? 'leader' : ''}`;
 
     el.innerHTML = `
-      ${c.thumbUrl ? `<img class="thumb" src="${esc(c.thumbUrl)}">` : `<div class="thumb"></div>`}
+      ${c.thumbUrl ? `<img class="thumb" src="${esc(c.thumbUrl)}" alt="${esc(c.title)}">` : `<div class="thumb"></div>`}
       <div class="pad">
         <p class="title">${esc(c.title)}</p>
+
         <p class="sub">${[c.gamerTag && `@${esc(c.gamerTag)}`, esc(c.game)].filter(Boolean).join(' • ')}</p>
 
-<p class="sub" style="font-size:12px;opacity:.6">
-  Submitted: ${new Date(c.submittedAt).toLocaleString(undefined,{
-    month:"short",
-    day:"numeric",
-    hour:"numeric",
-    minute:"2-digit"
-  })}
-</p>
+        <p class="sub" style="font-size:12px;opacity:.6">
+          Submitted: ${formatSubmittedAt(c.submittedAt)}
+        </p>
 
         <div class="row">
           <span class="pill">
@@ -278,11 +304,11 @@
           </span>
 
           <button data-id="${id}" ${alreadyVoted ? "disabled" : ""}>
-            ${alreadyVoted ? "Vote Locked" : "Vote"}
+            ${alreadyVoted ? (votedThisClip ? "Voted" : "Vote Locked") : "Vote"}
           </button>
         </div>
 
-        ${c.clipUrl ? `<div class="msg"><a class="link" href="${esc(c.clipUrl)}" target="_blank">Watch clip →</a></div>` : ``}
+        ${c.clipUrl ? `<div class="msg"><a class="link" href="${esc(c.clipUrl)}" target="_blank" rel="noopener">Watch clip →</a></div>` : ``}
         <div class="msg" id="m-${id}"></div>
       </div>
     `;
@@ -290,132 +316,141 @@
     return el;
   }
 
-  function wireVotes(container){
+  function wireVotes(container) {
     container.querySelectorAll('button[data-id]').forEach(btn => {
       btn.addEventListener('click', () => vote(btn));
     });
   }
 
-  async function loadClips(){
-
-    const res = await fetch(`/.netlify/functions/clips-get?t=${Date.now()}`,{cache:"no-store"});
+  async function loadClips() {
+    const res = await fetch(`/.netlify/functions/clips-get?t=${Date.now()}`, {
+      cache: "no-store"
+    });
     const data = await res.json();
 
-    CURRENT_WEEK = data.week;
+    CURRENT_WEEK = data.week || "";
+    weekPill.textContent = `Week: ${data.week || "—"}`;
+    countPill.textContent = `Clips: ${data.count ?? 0}`;
 
-    weekPill.textContent = `Week: ${data.week}`;
-    countPill.textContent = `Clips: ${data.count}`;
-
-    const clips = data.clips.map(normalizeClip);
+    const clips = Array.isArray(data.clips) ? data.clips.map(normalizeClip) : [];
 
     CLIPS_BY_ID = new Map();
-
     clips.forEach(c => CLIPS_BY_ID.set(String(c.id), c));
 
     const top3 = [...clips].sort((a, b) => {
-  const voteDiff = Number(b.votes || 0) - Number(a.votes || 0);
-  if (voteDiff !== 0) return voteDiff;
+      const voteDiff = Number(b.votes || 0) - Number(a.votes || 0);
+      if (voteDiff !== 0) return voteDiff;
 
-  const aTime = Date.parse(a.submittedAt || 0) || 0;
-  const bTime = Date.parse(b.submittedAt || 0) || 0;
+      const aTime = Date.parse(a.submittedAt || 0) || 0;
+      const bTime = Date.parse(b.submittedAt || 0) || 0;
+      return aTime - bTime; // earliest submission wins ties
+    }).slice(0, 3);
 
-  return aTime - bTime; // earlier submission ranks higher
-}).slice(0, 3);
-
-    const topIds = new Set(top3.map(c=>String(c.id)));
+    const topIds = new Set(top3.map(c => String(c.id)));
 
     const allSorted = clips
-  .filter(c => !topIds.has(String(c.id)))
-  .sort((a, b) => {
-    const bTime = Date.parse(b.submittedAt || 0) || 0;
-    const aTime = Date.parse(a.submittedAt || 0) || 0;
-    return bTime - aTime; // newest first for the non-top list
-  });
+      .filter(c => !topIds.has(String(c.id)))
+      .sort((a, b) => {
+        const bTime = Date.parse(b.submittedAt || 0) || 0;
+        const aTime = Date.parse(a.submittedAt || 0) || 0;
+        return bTime - aTime; // newest first
+      });
 
-    topGrid.innerHTML="";
-    top3.forEach((c,i)=>topGrid.appendChild(renderCard(c,{rank:i+1,leader:true})));
+    allHint.textContent = `Excludes the Top 3 so nothing is duplicated. (${allSorted.length} clip${allSorted.length === 1 ? "" : "s"} below)`;
 
-    allGrid.innerHTML="";
-    allSorted.forEach(c=>allGrid.appendChild(renderCard(c)));
+    topGrid.innerHTML = "";
+    top3.forEach((c, i) => topGrid.appendChild(renderCard(c, { rank: i + 1, leader: true })));
+
+    allGrid.innerHTML = "";
+    allSorted.forEach(c => allGrid.appendChild(renderCard(c)));
 
     wireVotes(topGrid);
     wireVotes(allGrid);
 
-    if(userAlreadyVoted()){
+    if (userAlreadyVoted()) {
       lockAllVotes();
       setStatus("Vote already cast this week", "ok");
-    }else{
+    } else {
       setStatus("Ready to vote", "ok");
     }
   }
 
-  function setVoteCount(clipId, votes){
+  function setVoteCount(clipId, votes) {
     const el = document.getElementById(`vc-${clipId}`);
-    if(el) el.textContent = votes;
+    if (el) el.textContent = String(votes);
   }
 
-  function setMsg(clipId, text, kind){
+  function setMsg(clipId, text, kind) {
     const msg = document.getElementById(`m-${clipId}`);
-    if(!msg) return;
+    if (!msg) return;
     msg.className = "msg " + (kind === "ok" ? "ok" : "bad");
     msg.textContent = text;
   }
 
-  async function vote(btn){
-
-    if(userAlreadyVoted()){
+  async function vote(btn) {
+    if (userAlreadyVoted()) {
       lockAllVotes();
       return;
     }
 
     const clipId = btn.getAttribute("data-id");
+    if (!clipId) return;
 
-    btn.disabled=true;
+    btn.disabled = true;
 
-    try{
+    try {
+      const voterToken = ensureBrowserVoterToken();
 
-     const voterToken = localStorage.getItem("gtcVoterToken") || "";
-
-const res = await fetch("/.netlify/functions/vote-post",{
-  method:"POST",
-  headers:{
-    'content-type':'application/json',
-    'x-gtc-voter': voterToken
-  },
-  body:JSON.stringify({clipId,week:CURRENT_WEEK})
-});
+      const res = await fetch("/.netlify/functions/vote-post", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-gtc-voter": voterToken
+        },
+        body: JSON.stringify({ clipId, week: CURRENT_WEEK })
+      });
 
       const data = await res.json();
 
-      if(!data.ok){
-        setMsg(clipId,data.error||"Vote failed","bad");
-        btn.disabled=false;
+      if (!data.ok) {
+        setMsg(clipId, data.error || "Vote failed", "bad");
+
+        if (String(data.error || "").toLowerCase().includes("already voted")) {
+          WEEKLY_VOTE = { week: CURRENT_WEEK, clipId: data.votedClipId || clipId };
+          localStorage.setItem(WEEK_VOTE_KEY, JSON.stringify(WEEKLY_VOTE));
+          lockAllVotes();
+          setStatus("Vote already cast this week", "ok");
+          return;
+        }
+
+        btn.disabled = false;
         return;
       }
 
-      setVoteCount(clipId,data.votes);
-      if(data.token){
-  localStorage.setItem("gtcVoterToken",data.token);
-}
+      setVoteCount(clipId, data.votes);
 
-      WEEKLY_VOTE = {week:CURRENT_WEEK, clipId};
+      if (data.token) {
+        localStorage.setItem(BROWSER_VOTER_TOKEN_KEY, data.token);
+      }
 
-      localStorage.setItem(WEEK_VOTE_KEY,JSON.stringify(WEEKLY_VOTE));
+      WEEKLY_VOTE = { week: CURRENT_WEEK, clipId };
+      localStorage.setItem(WEEK_VOTE_KEY, JSON.stringify(WEEKLY_VOTE));
 
-      setMsg(clipId,"Vote counted ✅","ok");
+      setMsg(clipId, "Vote counted ✅", "ok");
+      setStatus("Vote already cast this week", "ok");
 
       lockAllVotes();
 
-      btn.textContent="Voted";
-
-    }catch(e){
-      setMsg(clipId,"Vote failed","bad");
-      btn.disabled=false;
+    } catch (e) {
+      setMsg(clipId, "Vote failed", "bad");
+      btn.disabled = false;
     }
-
   }
 
-  document.addEventListener("DOMContentLoaded",loadClips);
+  document.addEventListener("DOMContentLoaded", () => {
+    ensureBrowserVoterToken();
+    loadClips();
+  });
 </script>
 </body>
 </html>
