@@ -374,11 +374,16 @@
 
     try{
 
-      const res = await fetch("/.netlify/functions/vote-post",{
-        method:"POST",
-        headers:{'content-type':'application/json'},
-        body:JSON.stringify({clipId,week:CURRENT_WEEK})
-      });
+     const voterToken = localStorage.getItem("gtcVoterToken") || "";
+
+const res = await fetch("/.netlify/functions/vote-post",{
+  method:"POST",
+  headers:{
+    'content-type':'application/json',
+    'x-gtc-voter': voterToken
+  },
+  body:JSON.stringify({clipId,week:CURRENT_WEEK})
+});
 
       const data = await res.json();
 
@@ -389,6 +394,9 @@
       }
 
       setVoteCount(clipId,data.votes);
+      if(data.token){
+  localStorage.setItem("gtcVoterToken",data.token);
+}
 
       WEEKLY_VOTE = {week:CURRENT_WEEK, clipId};
 
