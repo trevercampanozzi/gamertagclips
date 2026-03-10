@@ -53,17 +53,13 @@ function validateClipUrl(url) {
     const u = new URL(url);
     const host = u.hostname.toLowerCase();
 
-    if (
+    return (
       host.includes("youtube.com") ||
       host.includes("youtu.be") ||
       host.includes("tiktok.com") ||
       host.includes("twitch.tv") ||
       host.includes("clips.twitch.tv")
-    ) {
-      return true;
-    }
-
-    return false;
+    );
   } catch {
     return false;
   }
@@ -110,13 +106,8 @@ export default async (req) => {
         ok: true,
         skipped: true,
         reason: "competition-closed",
-        week: w.week,
-        closeUtcMs: w.closeUtcMs,
-        nextWeekStartUtcMs: w.nextWeekStartUtcMs
-      }), {
-        status: 200,
-        headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }
-      });
+        week: w.week
+      }), { status: 200 });
     }
 
     const url = new URL(req.url);
@@ -130,32 +121,22 @@ export default async (req) => {
       ? weekStartISO(week)
       : new Date(w.weekStartUtcMs).toISOString();
 
-    const weekCutoffISO =
-      (await store.get(`cutoff:${week}`, { type: "text" }).catch(() => "")) || "";
+    const existingDoc = await getClipsDoc(store, clipsKey);
+    const existingClips = existingDoc.clips || [];
 
-    const globalCutoffISO =
-      (await store.get(`global-cutoff`, { type: "text" }).catch(() => "")) || "";
+    const byId = new Map(existingClips.map(c => [String(c.id), c]));
+    const existingUrls = new Set(existingClips.map(c => (c.clipUrl || "").trim()));
 
-    let sinceISO = weekSinceISO;
+    // IP submission counter
+    const ipCounts = {};
 
-    if (globalCutoffISO && globalCutoffISO > sinceISO) {
-      sinceISO = globalCutoffISO;
-    }
-
-    if (weekCutoffISO && weekCutoffISO > sinceISO) {
-      sinceISO = weekCutoffISO;
+    for (const clip of existingClips) {
+      if (!clip.ip) continue;
+      ipCounts[clip.ip] = (ipCounts[clip.ip] || 0) + 1;
     }
 
     const forms = await apiGet(`/sites/${siteId}/forms`);
     const form = forms.find(f => f.name === "clip-submissions");
-
-    if (!form) {
-      return new Response(JSON.stringify({
-        ok: false,
-        error: "Form not found",
-        detail: "No form named 'clip-submissions' found on this Netlify site."
-      }), { status: 404 });
-    }
 
     const verified = await apiGet(`/forms/${form.id}/submissions?per_page=100`);
     const spam = await apiGet(`/forms/${form.id}/submissions?per_page=100&state=spam`);
@@ -163,47 +144,35 @@ export default async (req) => {
 
     const weeklySubs = all.filter(s => {
       const created = new Date(s.created_at).toISOString();
-      return created >= sinceISO;
+      return created >= weekSinceISO;
     });
 
-    const existingDoc = await getClipsDoc(store, clipsKey);
-    const existingClips = existingDoc.clips || [];
-
-    const byId = new Map(existingClips.map(c => [String(c.id), c]));
-    const existingUrls = new Set(existingClips.map(c => (c.clipUrl || "").trim()));
-
     let added = 0;
-    let skippedEmpty = 0;
-    let skippedAlreadySynced = 0;
-    let skippedInvalid = 0;
-    let skippedDuplicate = 0;
 
     for (const s of weeklySubs) {
 
       const data = s.data || {};
       const clipUrl = escTrim(pick(data, ["clipUrl", "clip_url", "url", "link"]));
 
-      if (!clipUrl) {
-        skippedEmpty++;
-        continue;
-      }
-
-      if (!validateClipUrl(clipUrl)) {
-        skippedInvalid++;
-        continue;
-      }
-
-      if (existingUrls.has(clipUrl)) {
-        skippedDuplicate++;
-        continue;
-      }
+      if (!clipUrl) continue;
+      if (!validateClipUrl(clipUrl)) continue;
+      if (existingUrls.has(clipUrl)) continue;
 
       const id = String(s.id);
+      if (byId.has(id)) continue;
 
-      if (byId.has(id)) {
-        skippedAlreadySynced++;
+      const ip =
+        s.ip ||
+        s.ip_address ||
+        "unknown";
+
+      ipCounts[ip] = (ipCounts[ip] || 0);
+
+      if (ipCounts[ip] >= 3) {
         continue;
       }
+
+      ipCounts[ip]++;
 
       let thumbUrl = escTrim(pick(data, ["thumbUrl", "thumb_url", "thumbnail", "thumbnailUrl"]));
 
@@ -223,46 +192,34 @@ export default async (req) => {
         clipUrl,
         thumbUrl,
         votes: 0,
+        ip,
         submittedAt: s.created_at
       };
 
       byId.set(id, newClip);
       existingUrls.add(clipUrl);
       added++;
+
     }
 
     const merged = Array.from(byId.values());
 
     merged.sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0));
 
-    await store.setJSON(clipsKey, { clips: merged }, {
-      metadata: { updatedAt: new Date().toISOString() }
-    });
+    await store.setJSON(clipsKey, { clips: merged });
 
     return new Response(JSON.stringify({
       ok: true,
       week,
-      submissionsThisWeek: weeklySubs.length,
-      clipsBefore: existingClips.length,
       clipsAfter: merged.length,
-      added,
-      skippedEmpty,
-      skippedAlreadySynced,
-      skippedInvalid,
-      skippedDuplicate
-    }), {
-      status: 200,
-      headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }
-    });
+      added
+    }));
 
   } catch (err) {
     return new Response(JSON.stringify({
       ok: false,
       error: "sync failed",
       detail: String(err)
-    }), {
-      status: 500,
-      headers: { "content-type": "application/json; charset=utf-8" }
-    });
+    }), { status: 500 });
   }
 };
