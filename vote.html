@@ -205,9 +205,10 @@
   let CURRENT_WEEK = "";
 
   let CLIPS_BY_ID = new Map();
-  let VOTED_THIS_SESSION = new Set(
-    JSON.parse(localStorage.getItem("gtcVotedClips") || "[]")
-  );
+
+  const WEEK_VOTE_KEY = "gtcWeekVote";
+
+  let WEEKLY_VOTE = JSON.parse(localStorage.getItem(WEEK_VOTE_KEY) || "{}");
 
   function esc(s){
     return String(s||"").replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m]));
@@ -220,11 +221,6 @@
     if(kind === 'bad') statusPill.style.borderColor = 'rgba(255,122,122,.35)';
   }
 
-  function toMs(d){
-    const t = Date.parse(d);
-    return Number.isFinite(t) ? t : 0;
-  }
-
   function normalizeClip(c){
     return {
       id: c.id,
@@ -232,49 +228,56 @@
       gamerTag: c.gamerTag || c.gamertag || '',
       game: c.game || '',
       votes: Number(c.votes || 0),
-      submittedAt: c.submittedAt || c.createdAt || '',
-      thumbUrl: c.thumbUrl || c.thumbnail || '',
-      clipUrl: c.clipUrl || c.url || ''
+      submittedAt: c.submittedAt || '',
+      thumbUrl: c.thumbUrl || '',
+      clipUrl: c.clipUrl || ''
     };
   }
 
+  function userAlreadyVoted(){
+    return WEEKLY_VOTE.week === CURRENT_WEEK;
+  }
+
+  function lockAllVotes(){
+    document.querySelectorAll("button[data-id]").forEach(btn=>{
+      btn.disabled = true;
+      btn.textContent = "Vote Locked";
+    });
+  }
+
   function renderCard(c, opts){
+
     const id = esc(c.id);
-    const title = esc(c.title);
-    const gamerTag = esc(c.gamerTag);
-    const game = esc(c.game);
     const votes = Number(c.votes || 0);
 
-    const thumbUrl = c.thumbUrl || '';
-    const clipUrl = c.clipUrl || '';
-
-    const rankHtml = (opts && opts.rank)
-      ? `<span class="pill"><span class="rank">#${opts.rank}</span></span>`
-      : '';
-
-    const leaderClass = (opts && opts.leader) ? 'leader' : '';
-    const disabledAttr = VOTED_THIS_SESSION.has(String(c.id)) ? 'disabled' : '';
+    const alreadyVoted = userAlreadyVoted();
 
     const el = document.createElement('div');
-    el.className = `card ${leaderClass}`.trim();
+
+    el.className = `card ${opts?.leader ? 'leader' : ''}`;
+
     el.innerHTML = `
-      ${thumbUrl ? `<img class="thumb" src="${esc(thumbUrl)}" alt="${title}">` : `<div class="thumb"></div>`}
+      ${c.thumbUrl ? `<img class="thumb" src="${esc(c.thumbUrl)}">` : `<div class="thumb"></div>`}
       <div class="pad">
-        <p class="title">${title}</p>
-        <p class="sub">${[gamerTag && `@${gamerTag}`, game].filter(Boolean).join(' • ')}</p>
+        <p class="title">${esc(c.title)}</p>
+        <p class="sub">${[c.gamerTag && `@${esc(c.gamerTag)}`, esc(c.game)].filter(Boolean).join(' • ')}</p>
 
         <div class="row">
           <span class="pill">
-            ${rankHtml}
+            ${opts?.rank ? `<span class="rank">#${opts.rank}</span>` : ""}
             <strong class="voteCount" id="vc-${id}">${votes}</strong> vote(s)
           </span>
-          <button data-id="${id}" ${disabledAttr}>Vote</button>
+
+          <button data-id="${id}" ${alreadyVoted ? "disabled" : ""}>
+            ${alreadyVoted ? "Vote Locked" : "Vote"}
+          </button>
         </div>
 
-        ${clipUrl ? `<div class="msg"><a class="link" href="${esc(clipUrl)}" target="_blank" rel="noopener">Watch clip →</a></div>` : ``}
+        ${c.clipUrl ? `<div class="msg"><a class="link" href="${esc(c.clipUrl)}" target="_blank">Watch clip →</a></div>` : ``}
         <div class="msg" id="m-${id}"></div>
       </div>
     `;
+
     return el;
   }
 
@@ -285,160 +288,103 @@
   }
 
   async function loadClips(){
-    setStatus('Loading…', null);
-    topGrid.innerHTML = '';
-    allGrid.innerHTML = '';
-    allHint.textContent = 'Excludes the Top 3 so nothing is duplicated.';
 
-    const res = await fetch(`/.netlify/functions/clips-get?t=${Date.now()}`, {
-      cache: "no-store"
-    });
+    const res = await fetch(`/.netlify/functions/clips-get?t=${Date.now()}`,{cache:"no-store"});
     const data = await res.json();
 
-    CURRENT_WEEK = data.week || "";
-    weekPill.textContent = `Week: ${data.week || '—'}`;
-    countPill.textContent = `Clips: ${data.count ?? '—'}`;
+    CURRENT_WEEK = data.week;
 
-    if (!data.clips || !data.clips.length) {
-      setStatus('No clips yet', 'bad');
-
-      const emptyHtml = `
-        <div class="card">
-          <div class="pad">
-            <p class="title">No clips yet</p>
-            <p class="sub">Submit a clip so we have something to vote on.</p>
-            <a class="link" href="/submit.html">Submit a clip →</a>
-          </div>
-        </div>
-      `;
-      topGrid.innerHTML = emptyHtml;
-      allGrid.innerHTML = emptyHtml;
-      return;
-    }
-
-    setStatus('Ready to vote', 'ok');
+    weekPill.textContent = `Week: ${data.week}`;
+    countPill.textContent = `Clips: ${data.count}`;
 
     const clips = data.clips.map(normalizeClip);
 
     CLIPS_BY_ID = new Map();
+
     clips.forEach(c => CLIPS_BY_ID.set(String(c.id), c));
 
-    const top3 = [...clips].sort((a,b) => {
-      const dv = (Number(b.votes)||0) - (Number(a.votes)||0);
-      if(dv !== 0) return dv;
-      return toMs(b.submittedAt) - toMs(a.submittedAt);
-    }).slice(0, 3);
+    const top3 = [...clips].sort((a,b)=>b.votes-a.votes).slice(0,3);
 
-    const topIds = new Set(top3.map(c => String(c.id)));
+    const topIds = new Set(top3.map(c=>String(c.id)));
 
-    const allSorted = [...clips]
-      .filter(c => !topIds.has(String(c.id)))
-      .sort((a,b) => {
-        const ds = toMs(b.submittedAt) - toMs(a.submittedAt);
-        if(ds !== 0) return ds;
-        return (Number(b.votes)||0) - (Number(a.votes)||0);
-      });
+    const allSorted = clips.filter(c=>!topIds.has(String(c.id)));
 
-    allHint.textContent = `Excludes the Top 3 so nothing is duplicated. (${allSorted.length} clip${allSorted.length===1?'':'s'} below)`;
+    topGrid.innerHTML="";
+    top3.forEach((c,i)=>topGrid.appendChild(renderCard(c,{rank:i+1,leader:true})));
 
-    topGrid.innerHTML = '';
-    top3.forEach((c, i) => topGrid.appendChild(renderCard(c, { rank: i + 1, leader: true })));
-
-    allGrid.innerHTML = '';
-    allSorted.forEach(c => allGrid.appendChild(renderCard(c, { leader: false })));
+    allGrid.innerHTML="";
+    allSorted.forEach(c=>allGrid.appendChild(renderCard(c)));
 
     wireVotes(topGrid);
     wireVotes(allGrid);
+
+    if(userAlreadyVoted()){
+      lockAllVotes();
+      setStatus("Vote already cast this week", "ok");
+    }else{
+      setStatus("Ready to vote", "ok");
+    }
+  }
+
+  function setVoteCount(clipId, votes){
+    const el = document.getElementById(`vc-${clipId}`);
+    if(el) el.textContent = votes;
   }
 
   function setMsg(clipId, text, kind){
     const msg = document.getElementById(`m-${clipId}`);
     if(!msg) return;
-    msg.className = 'msg ' + (kind === 'ok' ? 'ok' : (kind === 'bad' ? 'bad' : ''));
-    msg.textContent = text || '';
-  }
-
-  function setVoteCount(clipId, votes){
-    const el = document.getElementById(`vc-${clipId}`);
-    if(el) el.textContent = String(Number(votes || 0));
-  }
-
-  function disableAllVoteButtonsForClip(clipId){
-    document.querySelectorAll(`button[data-id="${CSS.escape(String(clipId))}"]`).forEach(b => {
-      b.disabled = true;
-    });
+    msg.className = "msg " + (kind === "ok" ? "ok" : "bad");
+    msg.textContent = text;
   }
 
   async function vote(btn){
-    const clipId = btn.getAttribute('data-id');
-    if(!clipId) return;
 
-    if(VOTED_THIS_SESSION.has(String(clipId))){
-      setMsg(clipId, 'Vote already counted recently. Try later.', 'bad');
-      disableAllVoteButtonsForClip(clipId);
+    if(userAlreadyVoted()){
+      lockAllVotes();
       return;
     }
 
-    const clip = CLIPS_BY_ID.get(String(clipId));
-    const before = clip ? Number(clip.votes || 0) : Number(document.getElementById(`vc-${clipId}`)?.textContent || 0);
-    const optimistic = before + 1;
+    const clipId = btn.getAttribute("data-id");
 
-    setVoteCount(clipId, optimistic);
-    setMsg(clipId, 'Counting vote…', null);
-
-    disableAllVoteButtonsForClip(clipId);
+    btn.disabled=true;
 
     try{
-      const res = await fetch('/.netlify/functions/vote-post', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ clipId, week: CURRENT_WEEK })
+
+      const res = await fetch("/.netlify/functions/vote-post",{
+        method:"POST",
+        headers:{'content-type':'application/json'},
+        body:JSON.stringify({clipId,week:CURRENT_WEEK})
       });
+
       const data = await res.json();
 
-      if (!res.ok || data.ok === false) {
-        setVoteCount(clipId, before);
-        setMsg(clipId, data.error || 'Vote failed', 'bad');
-
-        if(String(data.error || '').toLowerCase().includes('already')){
-          VOTED_THIS_SESSION.add(String(clipId));
-          localStorage.setItem("gtcVotedClips", JSON.stringify([...VOTED_THIS_SESSION]));
-          disableAllVoteButtonsForClip(clipId);
-        } else {
-          setTimeout(() => {
-            document.querySelectorAll(`button[data-id="${CSS.escape(String(clipId))}"]`).forEach(b => {
-              b.disabled = false;
-            });
-          }, 1200);
-        }
+      if(!data.ok){
+        setMsg(clipId,data.error||"Vote failed","bad");
+        btn.disabled=false;
         return;
       }
 
-      const serverVotes = (data.votes != null) ? Number(data.votes) : optimistic;
-      if(clip) clip.votes = serverVotes;
+      setVoteCount(clipId,data.votes);
 
-      setVoteCount(clipId, serverVotes);
-      setMsg(clipId, 'Vote counted ✅', 'ok');
+      WEEKLY_VOTE = {week:CURRENT_WEEK, clipId};
 
-      VOTED_THIS_SESSION.add(String(clipId));
-      localStorage.setItem("gtcVotedClips", JSON.stringify([...VOTED_THIS_SESSION]));
-      disableAllVoteButtonsForClip(clipId);
+      localStorage.setItem(WEEK_VOTE_KEY,JSON.stringify(WEEKLY_VOTE));
 
-    } catch(e){
-      setVoteCount(clipId, before);
-      setMsg(clipId, 'Vote failed. Try again.', 'bad');
+      setMsg(clipId,"Vote counted ✅","ok");
 
-      setTimeout(() => {
-        document.querySelectorAll(`button[data-id="${CSS.escape(String(clipId))}"]`).forEach(b => {
-          b.disabled = false;
-        });
-      }, 1200);
+      lockAllVotes();
+
+      btn.textContent="Voted";
+
+    }catch(e){
+      setMsg(clipId,"Vote failed","bad");
+      btn.disabled=false;
     }
+
   }
 
-  document.addEventListener("DOMContentLoaded", () => {
-    loadClips();
-  });
+  document.addEventListener("DOMContentLoaded",loadClips);
 </script>
 </body>
 </html>
