@@ -36,7 +36,6 @@ function generateToken() {
 }
 
 export default async (req) => {
-
   if (req.method !== "POST") {
     return json(405, { ok: false, error: "Method not allowed" });
   }
@@ -63,6 +62,8 @@ export default async (req) => {
   }
 
   const clipId = String(body.clipId || "").trim();
+  const refClipId = String(body.refClipId || body.shareRef || "").trim();
+
   if (!clipId) {
     return json(400, { ok: false, error: "clipId required" });
   }
@@ -84,36 +85,61 @@ export default async (req) => {
 
   const existingIpVote = await store.get(ipKey, { type: "json" }).catch(() => null);
   if (existingIpVote?.voted) {
-    return json(429, { ok: false, error: "You already voted this week" });
+    return json(429, {
+      ok: false,
+      error: "You already voted this week",
+      votedClipId: existingIpVote.clipId || null
+    });
   }
 
   if (tokenKey) {
     const existingTokenVote = await store.get(tokenKey, { type: "json" }).catch(() => null);
     if (existingTokenVote?.voted) {
-      return json(429, { ok: false, error: "You already voted this week" });
+      return json(429, {
+        ok: false,
+        error: "You already voted this week",
+        votedClipId: existingTokenVote.clipId || null
+      });
     }
   }
 
   const voteTime = new Date().toISOString();
-
-  await store.setJSON(ipKey, { voted: true, at: voteTime });
-
   const newToken = token || generateToken();
+
+  await store.setJSON(ipKey, {
+    voted: true,
+    clipId,
+    refClipId: refClipId || null,
+    at: voteTime
+  });
 
   await store.setJSON(`vote-token:${w.week}:${newToken}`, {
     voted: true,
+    clipId,
+    refClipId: refClipId || null,
     at: voteTime
   });
 
   clips[idx].votes = Number(clips[idx].votes || 0) + 1;
   clips[idx].lastVoteAt = voteTime;
 
+  let referralTracked = false;
+
+  if (refClipId) {
+    const refIdx = clips.findIndex(c => String(c.id) === refClipId);
+    if (refIdx !== -1) {
+      clips[refIdx].shareVotes = Number(clips[refIdx].shareVotes || 0) + 1;
+      clips[refIdx].lastShareVoteAt = voteTime;
+      referralTracked = true;
+    }
+  }
+
   await store.setJSON(key, { clips });
 
   return json(200, {
     ok: true,
     votes: clips[idx].votes,
-    token: newToken
+    token: newToken,
+    referralTracked
   });
-
 };

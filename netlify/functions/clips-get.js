@@ -4,56 +4,93 @@ import { getCompetitionWindow } from "./_week.js";
 function json(status, obj) {
   return new Response(JSON.stringify(obj), {
     status,
-    headers: { "content-type": "application/json", "cache-control": "no-store" },
+    headers: {
+      "content-type": "application/json",
+      "cache-control": "no-store"
+    }
   });
 }
 
-async function readClips(store, key) {
-  // ✅ Always ask blobs for JSON when possible
-  const val = await store.get(key, { type: "json" }).catch(() => null);
+function safeNumber(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function normalizeClips(val) {
   if (!val) return [];
 
-  // val could be: {clips:[...]} OR [...] depending on old/new writes
   if (Array.isArray(val)) return val;
+
   if (val && Array.isArray(val.clips)) return val.clips;
 
-  // fallback if something weird got stored
-  try {
-    if (typeof val === "string") {
+  if (typeof val === "string") {
+    try {
       const parsed = JSON.parse(val);
       if (Array.isArray(parsed)) return parsed;
       if (parsed && Array.isArray(parsed.clips)) return parsed.clips;
-    }
-  } catch {}
+    } catch {}
+  }
 
   return [];
 }
 
 export default async () => {
-  const store = getStore("gtc");
-  const w = getCompetitionWindow(new Date());
+  try {
 
-  const clipsKey = `clips:${w.week}`;
-  const stateKey = `state:${w.week}`;
+    const store = getStore("gtc");
+    const w = getCompetitionWindow(new Date());
 
-  const clips = await readClips(store, clipsKey);
+    const clipsKey = `clips:${w.week}`;
+    const stateKey = `state:${w.week}`;
 
-  const state = await store.get(stateKey, { type: "json" }).catch(() => null);
-  const locked = state?.locked === true;
+    const raw = await store.get(clipsKey, { type: "json" }).catch(() => null);
+    const clips = normalizeClips(raw);
 
-  return json(200, {
-    ok: true,
-    week: w.week,
-    count: clips.length,
-    clips,
-    isOpen: w.isOpen,
-    isClosed: w.isClosed,
-    weekStartUtcMs: w.weekStartUtcMs,
-    closeUtcMs: w.closeUtcMs,
-    nextWeekStartUtcMs: w.nextWeekStartUtcMs,
-    locked,
-    winner: locked ? (state?.winner || null) : null,
-    top3Final: locked ? (state?.top3 || []) : null,
-    tieBreaker: "earliest submission",
-  });
+    const state = await store.get(stateKey, { type: "json" }).catch(() => null);
+
+    const locked = state?.locked === true;
+
+    const normalized = clips.map((c) => ({
+      ...c,
+      votes: safeNumber(c.votes),
+      submittedAt: c.submittedAt || ""
+    }));
+
+    // Ranking rule
+    // votes DESC
+    // submittedAt ASC
+    const ranked = normalized.sort((a, b) => {
+
+      const voteDiff = b.votes - a.votes;
+      if (voteDiff !== 0) return voteDiff;
+
+      return String(a.submittedAt).localeCompare(String(b.submittedAt));
+
+    });
+
+    return json(200, {
+      ok: true,
+      week: w.week,
+      count: ranked.length,
+      clips: ranked,
+      isOpen: w.isOpen,
+      isClosed: w.isClosed,
+      weekStartUtcMs: w.weekStartUtcMs,
+      closeUtcMs: w.closeUtcMs,
+      nextWeekStartUtcMs: w.nextWeekStartUtcMs,
+      locked,
+      winner: locked ? (state?.winner || null) : null,
+      top3Final: locked ? (state?.top3 || []) : null,
+      tieBreaker: "votes desc, earliest submission wins tie"
+    });
+
+  } catch (err) {
+
+    return json(500, {
+      ok: false,
+      error: "clips-get-failed",
+      message: err?.message || "unknown-error"
+    });
+
+  }
 };

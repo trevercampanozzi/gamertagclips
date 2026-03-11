@@ -213,334 +213,228 @@ const WEEK_VOTE_KEY = "gtcWeekVote";
 let WEEKLY_VOTE = JSON.parse(localStorage.getItem(WEEK_VOTE_KEY) || "{}");
 
 function ensureToken(){
-  let token = localStorage.getItem(TOKEN_KEY);
-  if(!token){
-    token = crypto.randomUUID();
-    localStorage.setItem(TOKEN_KEY, token);
-  }
-  return token;
+let token = localStorage.getItem(TOKEN_KEY);
+if(!token){
+token = crypto.randomUUID();
+localStorage.setItem(TOKEN_KEY, token);
+}
+return token;
 }
 
 function esc(s){
-  return String(s || "").replace(/[&<>"']/g, m => ({
-    "&":"&amp;",
-    "<":"&lt;",
-    ">":"&gt;",
-    '"':"&quot;",
-    "'":"&#39;"
-  }[m]));
+return String(s || "").replace(/[&<>"']/g, m => ({
+"&":"&amp;",
+"<":"&lt;",
+">":"&gt;",
+'"':"&quot;",
+"'":"&#39;"
+}[m]));
 }
 
 function setStatus(text){
-  statusPill.textContent = text;
+statusPill.textContent = text;
 }
 
 function userVoted(){
-  return WEEKLY_VOTE.week === CURRENT_WEEK;
+return WEEKLY_VOTE.week === CURRENT_WEEK;
 }
 
 function lockVotes(){
-  document.querySelectorAll("button.voteBtn").forEach(b => {
-    b.disabled = true;
-    b.textContent = "Vote Locked";
-  });
+document.querySelectorAll("button.voteBtn").forEach(b => {
+b.disabled = true;
+b.textContent = "Vote Locked";
+});
 
-  if (WEEKLY_VOTE.clipId) {
-    document.querySelectorAll(`button[data-id="${WEEKLY_VOTE.clipId}"]`).forEach(b => {
-      b.textContent = "Voted";
-    });
-  }
+if (WEEKLY_VOTE.clipId) {
+document.querySelectorAll(`button[data-id="${WEEKLY_VOTE.clipId}"]`).forEach(b => {
+b.textContent = "Voted";
+});
+}
 }
 
 function shareClip(id){
-  const url = `${window.location.origin}/clip.html?id=${id}`;
-  navigator.clipboard.writeText(url);
-  alert("Clip link copied! Share it to get votes.");
+const url = `${window.location.origin}/clip.html?id=${id}`;
+navigator.clipboard.writeText(url);
+alert("Clip link copied! Share it to get votes.");
 }
 
 function renderCard(c, rank){
-  const id = esc(c.id);
-  const voted = userVoted();
-  const votedThis = voted && WEEKLY_VOTE.clipId === c.id;
 
-  const el = document.createElement("div");
-  el.className = "card" + (rank ? " leader" : "");
+const id = esc(c.id);
+const voted = userVoted();
+const votedThis = voted && WEEKLY_VOTE.clipId === c.id;
 
-  el.innerHTML = `
-    ${c.thumbUrl ? `<img class="thumb" src="${esc(c.thumbUrl)}" alt="${esc(c.title)}">` : `<div class="thumb"></div>`}
+const el = document.createElement("div");
+el.className = "card" + (rank ? " leader" : "");
 
-    <div class="pad">
-      <p class="title">${esc(c.title)}</p>
+el.innerHTML = `
+${c.thumbUrl ? `<img class="thumb" src="${esc(c.thumbUrl)}">` : `<div class="thumb"></div>`}
 
-      <p class="sub">${esc(c.gamerTag || "")} • ${esc(c.game || "")}</p>
+<div class="pad">
 
-      <div class="row">
-        <span class="pill">
-          ${rank ? `<span class="rank">#${rank}</span>` : ""}
-          <strong id="vc-${id}">${Number(c.votes || 0)}</strong> votes
-        </span>
+<p class="title">${esc(c.title)}</p>
 
-        <div style="display:flex;gap:6px;">
-          <button class="voteBtn" data-id="${id}" ${voted ? "disabled" : ""}>
-            ${voted ? (votedThis ? "Voted" : "Vote Locked") : "Vote"}
-          </button>
+<p class="sub">${esc(c.gamerTag || "")} • ${esc(c.game || "")}</p>
 
-          <button class="shareBtn" onclick="shareClip('${id}')">
-            Share
-          </button>
-        </div>
-      </div>
+<div class="row">
 
-      <div class="msg" id="pressure-${id}"></div>
+<span class="pill">
+${rank ? `<span class="rank">#${rank}</span>` : ""}
+<strong id="vc-${id}">${Number(c.votes || 0)}</strong> votes
+</span>
 
-      ${c.clipUrl ? `<div class="msg"><a href="${esc(c.clipUrl)}" target="_blank" rel="noopener">Watch Clip →</a></div>` : ""}
+<span class="pill">
+Share Votes:
+<strong id="sv-${id}">${Number(c.shareVotes || 0)}</strong>
+</span>
 
-      <div class="msg" id="m-${id}"></div>
-    </div>
-  `;
+</div>
 
-  return el;
+<div class="row">
+
+<div style="display:flex;gap:6px;">
+
+<button class="voteBtn" data-id="${id}" ${voted ? "disabled" : ""}>
+${voted ? (votedThis ? "Voted" : "Vote Locked") : "Vote"}
+</button>
+
+<button class="shareBtn" onclick="shareClip('${id}')">
+Share
+</button>
+
+</div>
+
+</div>
+
+<div class="msg" id="pressure-${id}"></div>
+
+${c.clipUrl ? `<div class="msg"><a href="${esc(c.clipUrl)}" target="_blank">Watch Clip →</a></div>` : ""}
+
+<div class="msg" id="m-${id}"></div>
+
+</div>
+`;
+
+return el;
 }
 
 function wireVotes(container){
-  container.querySelectorAll(".voteBtn").forEach(btn => {
-    btn.onclick = () => vote(btn);
-  });
-}
-
-function applyLeaderboardPressure(clips){
-  if (clips.length < 3) {
-    clips.forEach(c => {
-      const el = document.getElementById(`pressure-${c.id}`);
-      if (el) el.innerHTML = "";
-    });
-    return;
-  }
-
-  const sorted = [...clips].sort((a, b) => {
-    const voteDiff = Number(b.votes || 0) - Number(a.votes || 0);
-    if (voteDiff !== 0) return voteDiff;
-
-    const aTime = new Date(a.submittedAt || 0).getTime() || 0;
-    const bTime = new Date(b.submittedAt || 0).getTime() || 0;
-    return aTime - bTime;
-  });
-
-  const leaderVotes = Number(sorted[0].votes || 0);
-  const thirdVotes = Number(sorted[2].votes || 0);
-
-  clips.forEach(c => {
-    const el = document.getElementById(`pressure-${c.id}`);
-    if (!el) return;
-
-    const votes = Number(c.votes || 0);
-    const diff = thirdVotes - votes + 1;
-
-    if (votes >= thirdVotes) {
-      el.innerHTML = `🔥 Leader: ${leaderVotes} votes`;
-    } else {
-      el.innerHTML = `📈 Need ${diff} vote${diff === 1 ? "" : "s"} to reach Top 3`;
-    }
-  });
+container.querySelectorAll(".voteBtn").forEach(btn=>{
+btn.onclick=()=>vote(btn);
+});
 }
 
 function sortForTop3(clips){
-  return [...clips].sort((a, b) => {
-    const voteDiff = Number(b.votes || 0) - Number(a.votes || 0);
-    if (voteDiff !== 0) return voteDiff;
-
-    const aTime = new Date(a.submittedAt || 0).getTime() || 0;
-    const bTime = new Date(b.submittedAt || 0).getTime() || 0;
-    return aTime - bTime;
-  }).slice(0, 3);
+return [...clips].sort((a,b)=>{
+const dv=Number(b.votes||0)-Number(a.votes||0);
+if(dv!==0)return dv;
+const at=new Date(a.submittedAt||0).getTime();
+const bt=new Date(b.submittedAt||0).getTime();
+return at-bt;
+}).slice(0,3);
 }
 
-function sortForRest(clips, topIds){
-  return [...clips]
-    .filter(c => !topIds.has(String(c.id)))
-    .sort((a, b) => {
-      const bTime = new Date(b.submittedAt || 0).getTime() || 0;
-      const aTime = new Date(a.submittedAt || 0).getTime() || 0;
-      return bTime - aTime;
-    });
+function sortForRest(clips,topIds){
+return [...clips]
+.filter(c=>!topIds.has(String(c.id)))
+.sort((a,b)=>{
+const bt=new Date(b.submittedAt||0).getTime();
+const at=new Date(a.submittedAt||0).getTime();
+return bt-at;
+});
 }
 
 function renderAll(clips){
-  CLIPS_BY_ID = new Map();
-  clips.forEach(c => CLIPS_BY_ID.set(String(c.id), c));
 
-  const top = sortForTop3(clips);
-  const topIds = new Set(top.map(c => String(c.id)));
-  const rest = sortForRest(clips, topIds);
+CLIPS_BY_ID=new Map();
+clips.forEach(c=>CLIPS_BY_ID.set(String(c.id),c));
 
-  topGrid.innerHTML = "";
-  top.forEach((c, i) => topGrid.appendChild(renderCard(c, i + 1)));
+const top=sortForTop3(clips);
+const topIds=new Set(top.map(c=>String(c.id)));
+const rest=sortForRest(clips,topIds);
 
-  allGrid.innerHTML = "";
-  rest.forEach(c => allGrid.appendChild(renderCard(c)));
+topGrid.innerHTML="";
+top.forEach((c,i)=>topGrid.appendChild(renderCard(c,i+1)));
 
-  wireVotes(topGrid);
-  wireVotes(allGrid);
-  applyLeaderboardPressure(clips);
+allGrid.innerHTML="";
+rest.forEach(c=>allGrid.appendChild(renderCard(c)));
 
-  if(userVoted()){
-    lockVotes();
-    setStatus("Vote already cast this week");
-  }else{
-    setStatus("Ready to vote");
-  }
+wireVotes(topGrid);
+wireVotes(allGrid);
+
+if(userVoted()){
+lockVotes();
+setStatus("Vote already cast this week");
+}else{
+setStatus("Ready to vote");
+}
+
 }
 
 async function fetchClipsData(){
-  const res = await fetch(`/.netlify/functions/clips-get?t=${Date.now()}`, { cache: "no-store" });
-  return res.json();
+const res=await fetch(`/.netlify/functions/clips-get?t=${Date.now()}`,{cache:"no-store"});
+return res.json();
 }
 
 async function loadClips(){
-  const data = await fetchClipsData();
 
-  CURRENT_WEEK = data.week || "";
-  weekPill.textContent = `Week: ${data.week || "—"}`;
-  countPill.textContent = `Clips: ${data.count ?? 0}`;
+const data=await fetchClipsData();
 
-  const clips = Array.isArray(data.clips) ? data.clips : [];
-  renderAll(clips);
+CURRENT_WEEK=data.week||"";
+
+weekPill.textContent=`Week: ${data.week||"—"}`;
+countPill.textContent=`Clips: ${data.count??0}`;
+
+const clips=Array.isArray(data.clips)?data.clips:[];
+
+renderAll(clips);
+
 }
 
 async function refreshLiveVotes(){
-  try{
-    const data = await fetchClipsData();
 
-    if ((data.week || "") !== CURRENT_WEEK) {
-      CURRENT_WEEK = data.week || "";
-      weekPill.textContent = `Week: ${data.week || "—"}`;
-    }
+try{
 
-    countPill.textContent = `Clips: ${data.count ?? 0}`;
+const data=await fetchClipsData();
 
-    const freshClips = Array.isArray(data.clips) ? data.clips : [];
+countPill.textContent=`Clips: ${data.count??0}`;
 
-    const currentIds = Array.from(CLIPS_BY_ID.keys()).sort().join("|");
-    const freshIds = freshClips.map(c => String(c.id)).sort().join("|");
+const fresh=Array.isArray(data.clips)?data.clips:[];
 
-    if (currentIds !== freshIds) {
-      renderAll(freshClips);
-      return;
-    }
+fresh.forEach(c=>{
 
-    const currentTopIds = sortForTop3(Array.from(CLIPS_BY_ID.values())).map(c => String(c.id)).join("|");
-    const freshTopIds = sortForTop3(freshClips).map(c => String(c.id)).join("|");
+const id=String(c.id);
 
-    if (currentTopIds !== freshTopIds) {
-      renderAll(freshClips);
-      return;
-    }
+const vc=document.getElementById(`vc-${id}`);
+if(vc)vc.textContent=Number(c.votes||0);
 
-    CLIPS_BY_ID = new Map();
-    freshClips.forEach(c => CLIPS_BY_ID.set(String(c.id), c));
+const sv=document.getElementById(`sv-${id}`);
+if(sv)sv.textContent=Number(c.shareVotes||0);
 
-    freshClips.forEach(c => {
-      const id = String(c.id);
-      const vc = document.getElementById(`vc-${id}`);
-      if (vc) vc.textContent = String(Number(c.votes || 0));
-    });
+});
 
-    applyLeaderboardPressure(freshClips);
+if(userVoted()){
+lockVotes();
+setStatus("Vote already cast this week");
+}else{
+setStatus("Live updates active");
+}
 
-    if (userVoted()) {
-      lockVotes();
-      setStatus("Vote already cast this week");
-    } else {
-      setStatus("Live updates active");
-    }
-  }catch(e){
-    setStatus("Live update retrying…");
-  }
+}catch(e){
+setStatus("Live update retrying…");
+}
+
 }
 
 function startAutoRefresh(){
-  if (AUTO_REFRESH_TIMER) clearInterval(AUTO_REFRESH_TIMER);
-  AUTO_REFRESH_TIMER = setInterval(refreshLiveVotes, 8000);
+if(AUTO_REFRESH_TIMER)clearInterval(AUTO_REFRESH_TIMER);
+AUTO_REFRESH_TIMER=setInterval(refreshLiveVotes,8000);
 }
 
-function stopAutoRefresh(){
-  if (AUTO_REFRESH_TIMER) {
-    clearInterval(AUTO_REFRESH_TIMER);
-    AUTO_REFRESH_TIMER = null;
-  }
-}
-
-function setVoteCount(id, v){
-  const el = document.getElementById(`vc-${id}`);
-  if(el) el.textContent = v;
-}
-
-function setMsg(id, msg, type){
-  const el = document.getElementById(`m-${id}`);
-  if(!el) return;
-  el.className = "msg " + (type === "ok" ? "ok" : "bad");
-  el.textContent = msg;
-}
-
-async function vote(btn){
-  if(userVoted()){
-    lockVotes();
-    return;
-  }
-
-  const id = btn.getAttribute("data-id");
-  btn.disabled = true;
-
-  try{
-    const token = ensureToken();
-
-    const res = await fetch("/.netlify/functions/vote-post", {
-      method:"POST",
-      headers:{
-        "content-type":"application/json",
-        "x-gtc-voter":token
-      },
-      body:JSON.stringify({ clipId:id, week:CURRENT_WEEK })
-    });
-
-    const data = await res.json();
-
-    if(!data.ok){
-      setMsg(id, data.error || "Vote failed", "bad");
-      btn.disabled = false;
-      return;
-    }
-
-    setVoteCount(id, data.votes);
-
-    WEEKLY_VOTE = { week: CURRENT_WEEK, clipId: id };
-    localStorage.setItem(WEEK_VOTE_KEY, JSON.stringify(WEEKLY_VOTE));
-
-    setMsg(id, "Vote counted ✅", "ok");
-    setStatus("Vote already cast this week");
-    lockVotes();
-
-    setTimeout(refreshLiveVotes, 1200);
-
-  }catch(e){
-    setMsg(id, "Vote failed", "bad");
-    btn.disabled = false;
-  }
-}
-
-document.addEventListener("visibilitychange", () => {
-  if (document.hidden) {
-    stopAutoRefresh();
-  } else {
-    refreshLiveVotes();
-    startAutoRefresh();
-  }
-});
-
-document.addEventListener("DOMContentLoaded", async () => {
-  ensureToken();
-  await loadClips();
-  startAutoRefresh();
+document.addEventListener("DOMContentLoaded",async()=>{
+ensureToken();
+await loadClips();
+startAutoRefresh();
 });
 </script>
 
